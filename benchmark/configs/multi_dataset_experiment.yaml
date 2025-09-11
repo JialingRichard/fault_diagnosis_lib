@@ -1,0 +1,87 @@
+# 多数据集对比实验配置
+# ========================
+# 
+# 实验名称: 多数据集性能对比
+# 目标: 在多个数据集上评估模型泛化能力
+# 作者: Fault Diagnosis Benchmark Team  
+# 日期: 2025-01-11
+
+experiment:
+  name: "multi_dataset_comparison"
+  description: "在多个数据集上对比各模型性能"
+  version: "1.0"
+  author: "Benchmark Team"
+  tags:
+    - "comparison"
+    - "multi_dataset"
+    - "generalization"
+
+# 多数据集配置
+datasets:
+  - name: "swat"
+    config:
+      train_file: "../data/raw/swat_train.csv"
+      test_file: "../data/raw/swat_test.csv"
+      preprocessing:
+        normalize: true
+        fill_missing: true
+  
+  - name: "smd"
+    config:
+      train_file: "../data/raw/smd_train.csv"
+      test_file: "../data/raw/smd_test.csv"
+      preprocessing:
+        normalize: true
+        fill_missing: false
+  
+  - name: "kdd99"
+    config:
+      train_file: "../data/raw/kdd_train.csv"
+      test_file: "../data/raw/kdd_test.csv"
+      preprocessing:
+        normalize: true
+        fill_missing: true
+
+# 模型配置
+models:
+  iforest:
+    n_estimators: 100
+    contamination: 0.1
+    random_state: 42
+  
+  lstm_ae:
+    hidden_dim: 32
+    num_layers: 1
+    epochs: 30
+    batch_size: 64
+    lr: 0.001
+    random_state: 42
+
+# 评估配置
+evaluation:
+  metrics:
+    - "f1"
+    - "precision"
+    - "recall"
+    - "auc"
+    - "f1_point_adjusted"
+  
+  auto_threshold: true
+  
+  # 统计显著性检验
+  statistical_test:
+    enabled: true
+    method: "wilcoxon"  # wilcoxon, t_test
+    alpha: 0.05
+
+# 输出配置
+output:
+  save_results: true
+  generate_plots: true
+  results_dir: "../results/multi_dataset"
+  
+  # 生成综合报告
+  generate_comparison_report: true
+  
+  # 保存所有数据集的结果汇总
+  save_summary_table: true

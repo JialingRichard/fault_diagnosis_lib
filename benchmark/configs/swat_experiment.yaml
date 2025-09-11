@@ -1,0 +1,137 @@
+# 时序异常检测基准测试实验配置
+# ====================================
+# 
+# 实验名称: SWAT数据集基础基准测试
+# 目标: 对比Isolation Forest和LSTM AutoEncoder的性能
+# 作者: Fault Diagnosis Benchmark Team
+# 日期: 2025-01-11
+
+experiment:
+  name: "swat_benchmark_01"
+  description: "SWAT数据集上的异常检测基准测试"
+  version: "1.0"
+  author: "Benchmark Team"
+  tags:
+    - "swat"
+    - "industrial"
+    - "water_treatment"
+  notes: "使用默认参数进行基础性能评估"
+
+# 数据配置
+data:
+  dataset: "swat"
+  train_file: "../data/raw/swat_train.csv"
+  test_file: "../data/raw/swat_test.csv"
+  
+  # 预处理配置
+  preprocessing:
+    normalize: true
+    fill_missing: true
+    remove_outliers: false
+    scaling_method: "standard"  # standard, minmax, robust
+  
+  # 时序处理
+  window_size: 10
+  stride: 1
+  
+  # 数据采样（可选）
+  train_sample_ratio: 1.0  # 使用全部训练数据
+  test_sample_ratio: 1.0   # 使用全部测试数据
+
+# 模型配置
+models:
+  # Isolation Forest
+  iforest:
+    n_estimators: 100
+    contamination: 0.1
+    max_samples: "auto"
+    max_features: 1.0
+    bootstrap: false
+    n_jobs: -1
+    random_state: 42
+    verbose: 0
+  
+  # LSTM AutoEncoder
+  lstm_ae:
+    # 网络结构
+    hidden_dim: 64
+    num_layers: 2
+    dropout: 0.2
+    bidirectional: false
+    
+    # 训练参数
+    lr: 0.001
+    batch_size: 32
+    epochs: 50
+    patience: 10
+    min_delta: 0.0001
+    
+    # 优化器配置
+    optimizer: "adam"
+    weight_decay: 1e-4
+    
+    # 设备配置
+    device: "auto"  # auto, cpu, cuda
+    
+    # 其他
+    random_state: 42
+    verbose: true
+
+# 评估配置
+evaluation:
+  # 评估指标列表
+  metrics:
+    - "f1"
+    - "precision" 
+    - "recall"
+    - "accuracy"
+    - "auc"
+    - "f1_point_adjusted"
+    - "precision_pa"
+    - "recall_pa"
+    - "detection_delay"
+  
+  # 时序评估参数
+  tolerance: 0  # 时间容忍度
+  auto_threshold: true  # 自动阈值选择
+  threshold_method: "best_f1"  # best_f1, percentile_95, percentile_99
+  
+  # 交叉验证（可选）
+  cross_validation:
+    enabled: false
+    folds: 5
+    method: "time_series"  # standard, time_series
+
+# 输出配置
+output:
+  save_results: true
+  save_models: false
+  save_predictions: false
+  generate_plots: true
+  
+  # 目录配置
+  results_dir: "../results"
+  models_dir: "../models"
+  plots_dir: "../plots"
+  
+  # 报告配置
+  generate_report: true
+  report_format: "html"  # html, pdf, markdown
+  
+  # 日志配置
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: "../logs/experiment.log"
+
+# 计算资源配置
+resources:
+  # 并行处理
+  n_jobs: -1
+  
+  # 内存限制
+  max_memory_gb: 8
+  
+  # GPU配置
+  gpu_memory_fraction: 0.8
+  
+  # 随机种子
+  random_seed: 42

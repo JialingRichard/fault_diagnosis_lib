@@ -1,0 +1,43 @@
+data:
+  dataset: swat
+  preprocessing:
+    fill_missing: true
+    normalize: true
+    remove_outliers: false
+  stride: 1
+  test_file: ../data/raw/swat_test.csv
+  train_file: ../data/raw/swat_train.csv
+  window_size: 10
+evaluation:
+  auto_threshold: true
+  metrics:
+  - f1
+  - precision
+  - recall
+  - auc
+  - f1_point_adjusted
+  tolerance: 0
+experiment:
+  author: Benchmark Team
+  date: '2025-09-11 17:41:33'
+  description: 时序异常检测基准测试实验
+  name: benchmark_experiment_01
+  version: '1.0'
+models:
+  iforest:
+    contamination: 0.1
+    n_estimators: 100
+    random_state: 42
+  lstm_ae:
+    batch_size: 32
+    dropout: 0.2
+    epochs: 50
+    hidden_dim: 64
+    lr: 0.001
+    num_layers: 2
+    patience: 10
+output:
+  generate_plots: true
+  results_dir: ../results
+  save_models: false
+  save_results: true
