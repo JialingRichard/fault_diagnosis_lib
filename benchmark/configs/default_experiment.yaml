@@ -29,13 +29,14 @@ models:
     n_estimators: 100
     random_state: 42
   lstm_ae:
-    batch_size: 32
+    batch_size: 1
     dropout: 0.2
-    epochs: 50
+    epochs: 100
     hidden_dim: 64
     lr: 0.001
     num_layers: 2
     patience: 10
+    'device': 'cuda'  # 'auto', 'cpu', 'cuda'
 output:
   generate_plots: true
   results_dir: ../results

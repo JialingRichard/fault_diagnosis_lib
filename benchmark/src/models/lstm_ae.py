@@ -250,6 +250,9 @@ class LSTMAutoEncoderModel(BaseModel):
             
             avg_loss = epoch_loss / len(train_loader)
             
+            # print specific results each epoch
+            print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.6f}")
+            
             # 早停策略
             if avg_loss < best_loss:
                 best_loss = avg_loss

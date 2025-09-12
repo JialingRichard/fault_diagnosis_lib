@@ -21,7 +21,7 @@ __email__ = "chen.zhenling@qq.com"
 from .config_manager import ConfigManager, load_config, save_config, create_default_config
 from .dataloaders import DataPipeline, BaseDataLoader, DataMetadata
 from .models.base_model import BaseModel, ModelFactory
-from .trainer import Trainer, TrainingConfig, BatchTrainer
+from .trainer import Trainer, TrainingConfig
 from .metrics import TimeSeriesEvaluator, MetricsCalculator, evaluate_model, print_evaluation_report
 
 __all__ = [
