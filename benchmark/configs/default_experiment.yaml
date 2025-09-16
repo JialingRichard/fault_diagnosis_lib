@@ -29,7 +29,7 @@ models:
     n_estimators: 100
     random_state: 42
   lstm_ae:
-    batch_size: 1
+    batch_size: 128
     dropout: 0.2
     epochs: 100
     hidden_dim: 64
