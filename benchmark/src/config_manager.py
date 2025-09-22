@@ -8,8 +8,6 @@
 - 参数验证和类型检查
 - 配置版本管理
 
-Author: Fault Diagnosis Benchmark Team
-Date: 2025-01-11
 """
 
 import yaml
@@ -53,7 +51,7 @@ class ConfigManager:
             print(f"配置文件不存在")
         
         # 支持的配置文件扩展名
-        self.supported_extensions = {'.yaml', '.yml', '.json'}
+        self.supported_extensions = {'.yaml', '.json'}
         
         logger.info(f"配置管理器初始化完成，配置目录: {self.config_dir}")
     
@@ -92,7 +90,7 @@ class ConfigManager:
             logger.info(f"配置文件加载成功: {config_path}")
             
             # 环境变量替换
-            config = self._replace_env_variables(config)
+            # config = self._replace_env_variables(config)
             
             # 验证配置
             self._validate_config(config)
@@ -135,156 +133,6 @@ class ConfigManager:
             logger.error(f"保存配置文件失败: {e}")
             raise
     
-    def merge_configs(self, base_config: Dict[str, Any], 
-                     override_config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        合并配置，override_config会覆盖base_config中的相同键
-        
-        Args:
-            base_config: 基础配置
-            override_config: 覆盖配置
-            
-        Returns:
-            合并后的配置
-        """
-        merged = deepcopy(base_config)
-        
-        def _deep_merge(target: Dict, source: Dict):
-            """深度合并字典"""
-            for key, value in source.items():
-                if (key in target and 
-                    isinstance(target[key], dict) and 
-                    isinstance(value, dict)):
-                    _deep_merge(target[key], value)
-                else:
-                    target[key] = deepcopy(value)
-        
-        _deep_merge(merged, override_config)
-        
-        logger.info("配置合并完成")
-        return merged
-    
-    def create_config_template(self, template_name: str = "default") -> Dict[str, Any]:
-        """
-        创建配置模板
-        
-        Args:
-            template_name: 模板名称
-            
-        Returns:
-            配置模板字典
-        """
-        
-        if template_name == "default":
-            return self._create_default_template()
-        elif template_name == "minimal":
-            return self._create_minimal_template()
-        elif template_name == "full":
-            return self._create_full_template()
-        else:
-            raise ValueError(f"不支持的模板类型: {template_name}")
-    
-    def _create_default_template(self) -> Dict[str, Any]:
-        """创建默认配置模板"""
-        return {
-            'experiment': {
-                'name': 'default_experiment',
-                'description': '默认实验配置',
-                'version': '1.0',
-                'author': 'Benchmark Team',
-                'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            },
-            'data': {
-                'dataset': 'swat',
-                'train_file': '../data/raw/train.csv',
-                'test_file': '../data/raw/test.csv',
-                'preprocessing': {
-                    'normalize': True,
-                    'fill_missing': True,
-                    'remove_outliers': False
-                },
-                'window_size': 10,
-                'stride': 1
-            },
-            'models': {
-                'iforest': {
-                    'n_estimators': 100,
-                    'contamination': 0.1,
-                    'random_state': 42
-                }
-            },
-            'evaluation': {
-                'metrics': ['f1', 'precision', 'recall', 'auc'],
-                'tolerance': 0,
-                'auto_threshold': True
-            },
-            'output': {
-                'save_results': True,
-                'save_models': False,
-                'generate_plots': True,
-                'results_dir': '../results'
-            }
-        }
-    
-    def _create_minimal_template(self) -> Dict[str, Any]:
-        """创建最小配置模板"""
-        return {
-            'experiment': {
-                'name': 'minimal_experiment'
-            },
-            'data': {
-                'dataset': 'synthetic'
-            },
-            'models': {
-                'iforest': {}
-            },
-            'evaluation': {
-                'metrics': ['f1']
-            },
-            'output': {
-                'save_results': False
-            }
-        }
-    
-    def _create_full_template(self) -> Dict[str, Any]:
-        """创建完整配置模板"""
-        template = self._create_default_template()
-        
-        # 扩展模型配置
-        template['models'].update({
-            'lstm_ae': {
-                'hidden_dim': 64,
-                'num_layers': 2,
-                'dropout': 0.2,
-                'lr': 0.001,
-                'batch_size': 32,
-                'epochs': 50,
-                'patience': 10
-            },
-            'lof': {
-                'n_neighbors': 20,
-                'contamination': 0.1
-            }
-        })
-        
-        # 扩展评估配置
-        template['evaluation'].update({
-            'cross_validation': {
-                'enabled': False,
-                'folds': 5,
-                'method': 'time_series'
-            }
-        })
-        
-        # 扩展输出配置
-        template['output'].update({
-            'save_predictions': False,
-            'generate_report': True,
-            'log_level': 'INFO'
-        })
-        
-        return template
-    
     def _validate_config(self, config: Dict[str, Any]) -> None:
         """
         验证配置文件的基本结构和必需字段
@@ -319,81 +167,6 @@ class ConfigManager:
         
         logger.info("配置验证通过")
     
-    def _replace_env_variables(self, config: Any) -> Any:
-        """
-        递归替换配置中的环境变量
-        格式: ${ENV_VAR_NAME} 或 ${ENV_VAR_NAME:default_value}
-        
-        Args:
-            config: 配置值（可能是字典、列表、字符串等）
-            
-        Returns:
-            替换环境变量后的配置值
-        """
-        if isinstance(config, dict):
-            return {k: self._replace_env_variables(v) for k, v in config.items()}
-        elif isinstance(config, list):
-            return [self._replace_env_variables(item) for item in config]
-        elif isinstance(config, str):
-            return self._replace_string_env_variables(config)
-        else:
-            return config
-    
-    def _replace_string_env_variables(self, text: str) -> str:
-        """
-        替换字符串中的环境变量
-        
-        Args:
-            text: 包含环境变量的字符串
-            
-        Returns:
-            替换后的字符串
-        """
-        import re
-        
-        # 匹配 ${VAR_NAME} 或 ${VAR_NAME:default_value} 格式
-        pattern = r'\$\{([^}:]+)(?::([^}]*))?\}'
-        
-        def replace_match(match):
-            var_name = match.group(1)
-            default_value = match.group(2) if match.group(2) is not None else ''
-            return os.getenv(var_name, default_value)
-        
-        return re.sub(pattern, replace_match, text)
-    
-    def list_configs(self, pattern: str = "*.yaml") -> List[Path]:
-        """
-        列出配置目录中的所有配置文件
-        
-        Args:
-            pattern: 文件名模式
-            
-        Returns:
-            配置文件路径列表
-        """
-        config_files = list(self.config_dir.glob(pattern))
-        config_files.extend(self.config_dir.glob("*.yml"))
-        config_files.extend(self.config_dir.glob("*.json"))
-        
-        return sorted(set(config_files))
-    
-    def validate_config_file(self, config_path: Union[str, Path]) -> bool:
-        """
-        验证配置文件是否有效
-        
-        Args:
-            config_path: 配置文件路径
-            
-        Returns:
-            是否有效
-        """
-        try:
-            self.load_config(config_path)
-            return True
-        except Exception as e:
-            logger.error(f"配置文件验证失败: {e}")
-            return False
-    
     def get_config_info(self, config_path: Union[str, Path]) -> Dict[str, Any]:
         """
         获取配置文件信息
@@ -422,123 +195,323 @@ class ConfigManager:
         return info
 
 
-# 便捷函数
-def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
-    """
-    便捷的配置加载函数
-    
-    Args:
-        config_path: 配置文件路径
+    # # 便捷函数
+    # def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
+    #     """
+    #     便捷的配置加载函数
         
-    Returns:
-        配置字典
-    """
-    manager = ConfigManager()
-    return manager.load_config(config_path)
+    #     Args:
+    #         config_path: 配置文件路径
+            
+    #     Returns:
+    #         配置字典
+    #     """
+    #     manager = ConfigManager()
+    #     return manager.load_config(config_path)
 
 
-def save_config(config: Dict[str, Any], config_path: Union[str, Path]) -> None:
-    """
-    便捷的配置保存函数
+    # def save_config(config: Dict[str, Any], config_path: Union[str, Path]) -> None:
+    #     """
+    #     便捷的配置保存函数
+        
+    #     Args:
+    #         config: 配置字典
+    #         config_path: 保存路径
+    #     """
+    #     manager = ConfigManager()
+    #     manager.save_config(config, config_path)
+
+    # def create_config_template(self, template_name: str = "default") -> Dict[str, Any]:
+    #     """
+    #     创建配置模板
+        
+    #     Args:
+    #         template_name: 模板名称
+            
+    #     Returns:
+    #         配置模板字典
+    #     """
+        
+    #     if template_name == "default":
+    #         return self._create_default_template()
+    #     elif template_name == "minimal":
+    #         return self._create_minimal_template()
+    #     elif template_name == "full":
+    #         return self._create_full_template()
+    #     else:
+    #         raise ValueError(f"不支持的模板类型: {template_name}")
     
-    Args:
-        config: 配置字典
-        config_path: 保存路径
-    """
-    manager = ConfigManager()
-    manager.save_config(config, config_path)
+    # def _create_default_template(self) -> Dict[str, Any]:
+    #     """创建默认配置模板"""
+    #     return {
+    #         'experiment': {
+    #             'name': 'default_experiment',
+    #             'description': '默认实验配置',
+    #             'version': '1.0',
+    #             'author': 'Benchmark Team',
+    #             'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #         },
+    #         'data': {
+    #             'dataset': 'swat',
+    #             'train_file': '../data/raw/train.csv',
+    #             'test_file': '../data/raw/test.csv',
+    #             'preprocessing': {
+    #                 'normalize': True,
+    #                 'fill_missing': True,
+    #                 'remove_outliers': False
+    #             },
+    #             'window_size': 10,
+    #             'stride': 1
+    #         },
+    #         'models': {
+    #             'iforest': {
+    #                 'n_estimators': 100,
+    #                 'contamination': 0.1,
+    #                 'random_state': 42
+    #             }
+    #         },
+    #         'evaluation': {
+    #             'metrics': ['f1', 'precision', 'recall', 'auc'],
+    #             'tolerance': 0,
+    #             'auto_threshold': True
+    #         },
+    #         'output': {
+    #             'save_results': True,
+    #             'save_models': False,
+    #             'generate_plots': True,
+    #             'results_dir': '../results'
+    #         }
+    #     }
+    
+    # def _create_minimal_template(self) -> Dict[str, Any]:
+    #     """创建最小配置模板"""
+    #     return {
+    #         'experiment': {
+    #             'name': 'minimal_experiment'
+    #         },
+    #         'data': {
+    #             'dataset': 'synthetic'
+    #         },
+    #         'models': {
+    #             'iforest': {}
+    #         },
+    #         'evaluation': {
+    #             'metrics': ['f1']
+    #         },
+    #         'output': {
+    #             'save_results': False
+    #         }
+    #     }
+    
+    # def _create_full_template(self) -> Dict[str, Any]:
+    #     """创建完整配置模板"""
+    #     template = self._create_default_template()
+        
+    #     # 扩展模型配置
+    #     template['models'].update({
+    #         'lstm_ae': {
+    #             'hidden_dim': 64,
+    #             'num_layers': 2,
+    #             'dropout': 0.2,
+    #             'lr': 0.001,
+    #             'batch_size': 32,
+    #             'epochs': 50,
+    #             'patience': 10
+    #         },
+    #         'lof': {
+    #             'n_neighbors': 20,
+    #             'contamination': 0.1
+    #         }
+    #     })
+        
+    #     # 扩展评估配置
+    #     template['evaluation'].update({
+    #         'cross_validation': {
+    #             'enabled': False,
+    #             'folds': 5,
+    #             'method': 'time_series'
+    #         }
+    #     })
+        
+    #     # 扩展输出配置
+    #     template['output'].update({
+    #         'save_predictions': False,
+    #         'generate_report': True,
+    #         'log_level': 'INFO'
+    #     })
+        
+    #     return template
+    
+
+    
+    # def _replace_env_variables(self, config: Any) -> Any:
+    #     """
+    #     递归替换配置中的环境变量
+    #     格式: ${ENV_VAR_NAME} 或 ${ENV_VAR_NAME:default_value}
+        
+    #     Args:
+    #         config: 配置值（可能是字典、列表、字符串等）
+            
+    #     Returns:
+    #         替换环境变量后的配置值
+    #     """
+    #     if isinstance(config, dict):
+    #         return {k: self._replace_env_variables(v) for k, v in config.items()}
+    #     elif isinstance(config, list):
+    #         return [self._replace_env_variables(item) for item in config]
+    #     elif isinstance(config, str):
+    #         return self._replace_string_env_variables(config)
+    #     else:
+    #         return config
+    
+    # def _replace_string_env_variables(self, text: str) -> str:
+    #     """
+    #     替换字符串中的环境变量
+        
+    #     Args:
+    #         text: 包含环境变量的字符串
+            
+    #     Returns:
+    #         替换后的字符串
+    #     """
+    #     import re
+        
+    #     # 匹配 ${VAR_NAME} 或 ${VAR_NAME:default_value} 格式
+    #     pattern = r'\$\{([^}:]+)(?::([^}]*))?\}'
+        
+    #     def replace_match(match):
+    #         var_name = match.group(1)
+    #         default_value = match.group(2) if match.group(2) is not None else ''
+    #         return os.getenv(var_name, default_value)
+        
+    #     return re.sub(pattern, replace_match, text)
+    
+    # def list_configs(self, pattern: str = "*.yaml") -> List[Path]:
+    #     """
+    #     列出配置目录中的所有配置文件
+        
+    #     Args:
+    #         pattern: 文件名模式
+            
+    #     Returns:
+    #         配置文件路径列表
+    #     """
+    #     config_files = list(self.config_dir.glob(pattern))
+    #     config_files.extend(self.config_dir.glob("*.yml"))
+    #     config_files.extend(self.config_dir.glob("*.json"))
+        
+    #     return sorted(set(config_files))
+    
+    # def validate_config_file(self, config_path: Union[str, Path]) -> bool:
+    #     """
+    #     验证配置文件是否有效
+        
+    #     Args:
+    #         config_path: 配置文件路径
+            
+    #     Returns:
+    #         是否有效
+    #     """
+    #     try:
+    #         self.load_config(config_path)
+    #         return True
+    #     except Exception as e:
+    #         logger.error(f"配置文件验证失败: {e}")
+    #         return False
+    
 
 
-def create_default_config() -> Dict[str, Any]:
-    """
-    创建默认配置的便捷函数
+
+# def create_default_config() -> Dict[str, Any]:
+#     """
+#     创建默认配置的便捷函数
     
-    Returns:
-        默认配置字典
-    """
-    manager = ConfigManager()
-    return manager.create_config_template('default')
+#     Returns:
+#         默认配置字典
+#     """
+#     manager = ConfigManager()
+#     return manager.create_config_template('default')
 
 
-# 配置工具类
-class ConfigUtils:
-    """配置工具类，提供额外的配置操作功能"""
+# # 配置工具类
+# class ConfigUtils:
+#     """配置工具类，提供额外的配置操作功能"""
     
-    @staticmethod
-    def flatten_config(config: Dict[str, Any], separator: str = '.') -> Dict[str, Any]:
-        """
-        将嵌套配置展平为单层字典
+#     @staticmethod
+#     def flatten_config(config: Dict[str, Any], separator: str = '.') -> Dict[str, Any]:
+#         """
+#         将嵌套配置展平为单层字典
         
-        Args:
-            config: 嵌套配置字典
-            separator: 键分隔符
+#         Args:
+#             config: 嵌套配置字典
+#             separator: 键分隔符
             
-        Returns:
-            展平后的字典
-        """
-        def _flatten(obj, prefix=''):
-            if isinstance(obj, dict):
-                for key, value in obj.items():
-                    new_key = f"{prefix}{separator}{key}" if prefix else key
-                    yield from _flatten(value, new_key)
-            else:
-                yield prefix, obj
+#         Returns:
+#             展平后的字典
+#         """
+#         def _flatten(obj, prefix=''):
+#             if isinstance(obj, dict):
+#                 for key, value in obj.items():
+#                     new_key = f"{prefix}{separator}{key}" if prefix else key
+#                     yield from _flatten(value, new_key)
+#             else:
+#                 yield prefix, obj
         
-        return dict(_flatten(config))
+#         return dict(_flatten(config))
     
-    @staticmethod
-    def unflatten_config(flat_config: Dict[str, Any], separator: str = '.') -> Dict[str, Any]:
-        """
-        将展平的配置还原为嵌套字典
+    # @staticmethod
+    # def unflatten_config(flat_config: Dict[str, Any], separator: str = '.') -> Dict[str, Any]:
+    #     """
+    #     将展平的配置还原为嵌套字典
         
-        Args:
-            flat_config: 展平的配置字典
-            separator: 键分隔符
+    #     Args:
+    #         flat_config: 展平的配置字典
+    #         separator: 键分隔符
             
-        Returns:
-            嵌套配置字典
-        """
-        result = {}
+    #     Returns:
+    #         嵌套配置字典
+    #     """
+    #     result = {}
         
-        for key, value in flat_config.items():
-            keys = key.split(separator)
-            target = result
+    #     for key, value in flat_config.items():
+    #         keys = key.split(separator)
+    #         target = result
             
-            for k in keys[:-1]:
-                if k not in target:
-                    target[k] = {}
-                target = target[k]
+    #         for k in keys[:-1]:
+    #             if k not in target:
+    #                 target[k] = {}
+    #             target = target[k]
             
-            target[keys[-1]] = value
+    #         target[keys[-1]] = value
         
-        return result
+    #     return result
     
-    @staticmethod
-    def diff_configs(config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        比较两个配置的差异
+    # @staticmethod
+    # def diff_configs(config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
+    #     """
+    #     比较两个配置的差异
         
-        Args:
-            config1: 配置1
-            config2: 配置2
+    #     Args:
+    #         config1: 配置1
+    #         config2: 配置2
             
-        Returns:
-            差异字典
-        """
-        flat1 = ConfigUtils.flatten_config(config1)
-        flat2 = ConfigUtils.flatten_config(config2)
+    #     Returns:
+    #         差异字典
+    #     """
+    #     flat1 = ConfigUtils.flatten_config(config1)
+    #     flat2 = ConfigUtils.flatten_config(config2)
         
-        all_keys = set(flat1.keys()) | set(flat2.keys())
+    #     all_keys = set(flat1.keys()) | set(flat2.keys())
         
-        diff = {}
-        for key in all_keys:
-            val1 = flat1.get(key, '<MISSING>')
-            val2 = flat2.get(key, '<MISSING>')
+    #     diff = {}
+    #     for key in all_keys:
+    #         val1 = flat1.get(key, '<MISSING>')
+    #         val2 = flat2.get(key, '<MISSING>')
             
-            if val1 != val2:
-                diff[key] = {
-                    'config1': val1,
-                    'config2': val2
-                }
+    #         if val1 != val2:
+    #             diff[key] = {
+    #                 'config1': val1,
+    #                 'config2': val2
+    #             }
         
-        return diff
+    #     return diff

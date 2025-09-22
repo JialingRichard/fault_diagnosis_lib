@@ -19,8 +19,8 @@ import pickle
 import time
 from datetime import datetime
 
-from .models.base_model import BaseModel, ModelFactory, DataMetadata
-from .metrics import TimeSeriesEvaluator
+from models.base_model import BaseModel, ModelFactory, DataMetadata
+from src.metrics import TimeSeriesEvaluator
 
 logger = logging.getLogger(__name__)
 

@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple, Optional, Any
 import logging
 import warnings
 
-from .models.base_model import DataMetadata
+from models.base_model import DataMetadata
 
 logger = logging.getLogger(__name__)
 

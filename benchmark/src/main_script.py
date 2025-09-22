@@ -28,7 +28,7 @@ print(f"项目根目录: {project_root}")
 # 导入框架组件
 from src.config_manager import ConfigManager
 from src.dataloaders import DataPipeline
-from src.models.base_model import ModelFactory
+from models.base_model import ModelFactory
 from src.trainer import Trainer
 from src.metrics import TimeSeriesEvaluator, print_evaluation_report
 

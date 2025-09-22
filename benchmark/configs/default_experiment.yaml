@@ -1,13 +1,15 @@
 data:
-  dataset: swat
-  preprocessing:
-    fill_missing: true
-    normalize: true
-    remove_outliers: false
-  stride: 1
-  test_file: ../data/raw/swat_test.csv
-  train_file: ../data/raw/swat_train.csv
-  window_size: 10
+  dataset: NPY_UCI_HAR
+  train_data : ./data/NPY_UCI_HAR/train_X.npy
+  train_label : ./data/NPY_UCI_HAR/train_y.npy
+  test_data : ./data/NPY_UCI_HAR/test_X.npy
+  test_label : ./data/NPY_UCI_HAR/test_y.npy
+  # preprocessing:
+  #   fill_missing: true
+  #   normalize: true
+  #   remove_outliers: false
+  # stride: 1
+  # window_size: 10
 evaluation:
   auto_threshold: true
   metrics:
@@ -39,6 +41,6 @@ models:
     'device': 'cuda'  # 'auto', 'cpu', 'cuda'
 output:
   generate_plots: true
-  results_dir: ../results
+  results_dir: ./results
   save_models: false
   save_results: true
