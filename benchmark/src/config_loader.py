@@ -49,7 +49,7 @@ class ConfigLoader:
         # 支持的配置文件扩展名
         self.supported_extensions = {'.yaml', '.json'}
         
-        logger.info(f"配置加载器初始化完成，配置目录: {self.config_dir}")
+        logger.debug(f"配置加载器初始化完成，配置目录: {self.config_dir}")
     
     def load_config(self) -> Dict[str, Any]:
         """

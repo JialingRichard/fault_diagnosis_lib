@@ -38,7 +38,7 @@ class TrainingLoader:
         self.trainers_dir = Path(trainers_dir)
         self.trainer_registry = {}
         
-        logger.info(f"训练加载器初始化完成，训练器目录: {self.trainers_dir}")
+        logger.debug(f"训练加载器初始化完成，训练器目录: {self.trainers_dir}")
     
     def create_trainer(self, config: Dict[str, Any], training_template_name: str, 
                       model: nn.Module, X_train: np.ndarray, y_train: np.ndarray,
@@ -81,7 +81,7 @@ class TrainingLoader:
             y_test=y_test
         )
         
-        logger.info(f"训练器创建成功，类型: {training_type}")
+        logger.debug(f"训练器创建成功，类型: {training_type}")
         return trainer
     
     def _load_trainer_class(self, training_type: str, training_config: Dict[str, Any]):
@@ -100,7 +100,7 @@ class TrainingLoader:
                 module = importlib.import_module(f"trainers.{module_name}")
                 trainer_class = getattr(module, class_name)
                 self.trainer_registry[trainer_key] = trainer_class
-                logger.info(f"训练器 '{training_type}' 加载成功 (模块: {module_name}, 类: {class_name})")
+                logger.debug(f"训练器 '{training_type}' 加载成功 (模块: {module_name}, 类: {class_name})")
             except ImportError:
                 raise TrainingLoadError(f"无法导入训练器模块: trainers.{module_name}")
             except AttributeError:

@@ -37,7 +37,7 @@ class ModelLoader:
         self.models_dir = Path(models_dir)
         self.model_registry = {}
         
-        logger.info(f"模型加载器初始化完成，模型目录: {self.models_dir}")
+        logger.debug(f"模型加载器初始化完成，模型目录: {self.models_dir}")
     
     def load_model_from_config(self, 
                               model_name: str,

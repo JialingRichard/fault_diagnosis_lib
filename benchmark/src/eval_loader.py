@@ -35,7 +35,7 @@ class EvalLoader:
         self.evaluators_dir = Path(evaluators_dir)
         self.evaluator_registry = {}
         
-        logger.info(f"评估加载器初始化完成，评估器目录: {self.evaluators_dir}")
+        logger.debug(f"评估加载器初始化完成，评估器目录: {self.evaluators_dir}")
     
     def evaluate(self, config: Dict[str, Any], eval_template_name: str,
                 X_train: np.ndarray, y_train: np.ndarray, y_train_pred: np.ndarray,

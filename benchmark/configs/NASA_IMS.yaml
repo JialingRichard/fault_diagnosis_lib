@@ -60,6 +60,7 @@ training_templates:
     patience: 10
     optimizer: 'adam'
     print_interval: 10  # 每10轮打印一次训练信息
+    data_fraction: 1.0  # 使用100%的数据集（默认值）
   
   supervised_fast:
     type: supervised
@@ -69,6 +70,17 @@ training_templates:
     patience: 2
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印（用于快速调试）
+    data_fraction: 0.1  # 只使用10%的数据集，用于快速测试流程
+  
+  supervised_debug:
+    type: supervised
+    batch_size: 64
+    epochs: 3
+    lr: 0.001
+    patience: 2
+    optimizer: 'adam'
+    print_interval: 1   # 每轮都打印
+    data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
   
   # self_supervised:
   #   type: self_supervised  # 自监督学习训练
@@ -90,11 +102,17 @@ training_templates:
 
 # 实验定义 - 支持多个实验
 experiments:
-  - name: "LSTM_NASA_IMS_baseline"
+  - name: "LSTM_NASA_IMS_debug"
     model: "LSTM"
     dataset: "NASA_IMS"
-    training: "supervised_fast"
+    training: "supervised_debug"
     evaluation: "default"
+    
+  # - name: "LSTM_NASA_IMS_baseline"
+  #   model: "LSTM"
+  #   dataset: "NASA_IMS"
+  #   training: "supervised_fast"
+  #   evaluation: "default"
 
   - name: "LSTM_NPY_UCI_HAR_baseline"
     model: "LSTM"

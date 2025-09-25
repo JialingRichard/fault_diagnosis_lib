@@ -37,6 +37,23 @@ class SupervisedTrainer:
         self.config = config
         self.device = device
         
+        # 应用数据子集采样（如果配置了data_fraction）
+        data_fraction = config.get('data_fraction', 1.0)
+        if data_fraction < 1.0:
+            train_size = int(len(X_train) * data_fraction)
+            test_size = int(len(X_test) * data_fraction)
+            
+            # 随机采样训练数据（保持类别分布）
+            train_indices = np.random.choice(len(X_train), train_size, replace=False)
+            test_indices = np.random.choice(len(X_test), test_size, replace=False)
+            
+            X_train = X_train[train_indices]
+            y_train = y_train[train_indices]
+            X_test = X_test[test_indices]
+            y_test = y_test[test_indices]
+            
+            print(f"   数据子集: {data_fraction:.1%} ({train_size:,}训练 + {test_size:,}测试)")
+        
         # 数据转换
         self.X_train = torch.FloatTensor(X_train).to(device)
         self.y_train = torch.LongTensor(y_train.flatten()).to(device)
@@ -65,7 +82,7 @@ class SupervisedTrainer:
         self.patience_counter = 0
         self.training_history = {'train_loss': [], 'val_loss': []}
         
-        logger.info(f"监督学习训练器初始化完成")
+
     
     def _create_optimizer(self):
         """创建优化器"""
@@ -91,7 +108,7 @@ class SupervisedTrainer:
         epochs = self.config.get('epochs', 100)
         patience = self.config.get('patience', 10)
         
-        logger.info(f"开始训练，epochs: {epochs}, patience: {patience}")
+        print(f"   {epochs}轮训练 (耐心度:{patience})")
         
         for epoch in range(epochs):
             # 训练阶段
@@ -113,15 +130,15 @@ class SupervisedTrainer:
                 self.best_val_loss = val_loss
                 self.patience_counter = 0
                 if epoch % print_interval == 0 or epoch == epochs - 1:
-                    logger.info(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f} (改善 {improvement:.4f})")
+                    print(f"   E{epoch+1:3d}/{epochs}: {train_loss:.4f}→{val_loss:.4f} ↓{improvement:.4f}")
             else:
                 self.patience_counter += 1
                 if epoch % print_interval == 0 or epoch == epochs - 1:
-                    logger.info(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f} (无改善 {self.patience_counter}/{patience})")
+                    print(f"   E{epoch+1:3d}/{epochs}: {train_loss:.4f}→{val_loss:.4f} ×{self.patience_counter}/{patience}")
             
             # 早停
             if self.patience_counter >= patience:
-                logger.info(f"早停触发: 连续 {patience} 轮验证损失无改善，epoch: {epoch+1}")
+                print(f"   早停: {patience}轮无改善 @E{epoch+1}")
                 break
         
         # 生成预测结果
@@ -135,10 +152,15 @@ class SupervisedTrainer:
             'total_epochs': epoch + 1,
             'training_history': self.training_history,
             'train_predictions': train_pred,
-            'test_predictions': test_pred
+            'test_predictions': test_pred,
+            # 返回实际使用的数据用于评估
+            'actual_X_train': self.X_train.cpu().numpy(),
+            'actual_y_train': self.y_train.cpu().numpy(),
+            'actual_X_test': self.X_test.cpu().numpy(),
+            'actual_y_test': self.y_test.cpu().numpy()
         }
         
-        logger.info(f"训练完成，最终验证损失: {val_loss:.4f}")
+
         return results
     
     def _train_epoch(self) -> float:

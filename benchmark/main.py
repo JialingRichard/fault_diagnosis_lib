@@ -63,56 +63,61 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     model_loader = ModelLoader()
     training_loader = TrainingLoader()
     eval_loader = EvalLoader()
-    print("   所有组件初始化完成")
+    print("所有组件就绪")
     print()
     
     # 3. 运行实验
     results_summary = []
     
     for exp_idx, experiment in enumerate(experiments, 1):
-        print(f"步骤 3.{exp_idx}: 执行实验 - {experiment['name']}")
-        print("-" * 60)
+        print(f"\n{'='*20} 实验 {exp_idx}/{len(experiments)}: {experiment['name']} {'='*20}")
+        print(f"{experiment['model']} | {experiment['dataset']} | {experiment['training']}")
+        print("-" * 80)
         
         try:
             # 3.1 数据加载
-            print(f"   加载数据集: {experiment['dataset']}")
+            # 数据加载
             X_train, X_test, y_train, y_test, metadata = data_loader.prepare_data(
                 config, experiment['dataset']
             )
-            print(f"   训练集: {X_train.shape}, 测试集: {X_test.shape}")
-            print(f"   特征维度: {metadata.feature_dim}, 类别数: {metadata.num_classes}")
+            print(f"数据: {X_train.shape[0]:,}训练+{X_test.shape[0]:,}测试 | 特征:{metadata.feature_dim} | 类别:{metadata.num_classes}")
             
-            # 3.2 模型加载
-            print(f"   加载模型: {experiment['model']}")
+            # 模型加载
             model = model_loader.load_model_from_config(
                 experiment['model'], config, input_dim=metadata.feature_dim
             )
             param_count = sum(p.numel() for p in model.parameters())
-            print(f"   模型参数数量: {param_count:,}")
+            print(f"模型: {param_count:,}参数")
             
-            # 3.3 训练
-            print(f"   开始训练: {experiment['training']}")
+            # 开始训练
+            print(f"开始训练...")
             trainer = training_loader.create_trainer(
                 config, experiment['training'], model,
                 X_train, y_train, X_test, y_test
             )
             training_results = trainer.train()
             
-            print(f"   训练完成: {training_results['total_epochs']} epochs")
-            print(f"   最终验证损失: {training_results['final_val_loss']:.4f}")
-            
             # 3.4 评估
-            print(f"   开始评估: {experiment['evaluation']}")
+            print(f"开始评估...")
+            
+            # 使用训练器实际使用的数据进行评估（可能是子集）
+            actual_X_train = training_results.get('actual_X_train', X_train)
+            actual_y_train = training_results.get('actual_y_train', y_train)
+            actual_X_test = training_results.get('actual_X_test', X_test)
+            actual_y_test = training_results.get('actual_y_test', y_test)
+            
             eval_results = eval_loader.evaluate(
                 config, experiment['evaluation'],
-                X_train, y_train, training_results['train_predictions'],
-                X_test, y_test, training_results['test_predictions']
+                actual_X_train, actual_y_train, training_results['train_predictions'],
+                actual_X_test, actual_y_test, training_results['test_predictions']
             )
             
-            print(f"   评估结果:")
+            print(f"训练完成: {training_results['total_epochs']}轮 | 验证损失: {training_results['final_val_loss']:.4f}")
+            print(f"评估结果: ", end="")
             for metric, score in eval_results.items():
                 if score is not None:
-                    print(f"     {metric}: {score:.4f}")
+                    print(f"{metric}={score:.4f} ", end="")
+            print()
             
             # 保存结果
             results_summary.append({
@@ -126,10 +131,10 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                 'eval_results': eval_results
             })
             
-            print(f"   实验 {experiment['name']} 完成")
+            print(f"实验完成\n")
             
         except Exception as e:
-            print(f"   实验 {experiment['name']} 失败: {str(e)}")
+            print(f"实验失败: {str(e)}")
             logging.error(f"实验失败: {experiment['name']}", exc_info=True)
             
         print()
@@ -150,8 +155,12 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             f1_score = result['eval_results'].get('f1', 0)
             accuracy = result['eval_results'].get('accuracy', 0)
             
-            print(f"{result['name']:<25} {result['model']:<8} {result['parameters']:<10,} "
-                  f"{result['epochs']:<6} {result['val_loss']:<10.4f} "
+            params = result.get('parameters', 0) or 0  # 处理None值
+            epochs = result.get('epochs', 0) or 0  # 处理None值
+            val_loss = result.get('val_loss', 0) or 0  # 处理None值
+            
+            print(f"{result['name']:<25} {result['model']:<8} {params:<10,} "
+                  f"{epochs:<6} {val_loss:<10.4f} "
                   f"{f1_score:<8.4f} {accuracy:<8.4f}")
         
         print()
