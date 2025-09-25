@@ -9,6 +9,12 @@ from torch.utils.data import DataLoader, TensorDataset
 from typing import Dict, Any, Tuple
 import numpy as np
 import logging
+import sys
+from pathlib import Path
+
+# 添加src目录到路径
+sys.path.append(str(Path(__file__).parent.parent / "src"))
+from epochinfo_loader import EpochInfoLoader
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +28,7 @@ class SupervisedTrainer:
     
     def __init__(self, model: nn.Module, config: Dict[str, Any], device: str,
                  X_train: np.ndarray, y_train: np.ndarray, 
-                 X_test: np.ndarray, y_test: np.ndarray):
+                 X_test: np.ndarray, y_test: np.ndarray, full_config: Dict[str, Any] = None):
         """
         初始化监督学习训练器
         
@@ -32,9 +38,11 @@ class SupervisedTrainer:
             device: 训练设备
             X_train, y_train: 训练数据
             X_test, y_test: 测试数据
+            full_config: 完整配置（用于访问epochinfo_templates等）
         """
         self.model = model
         self.config = config
+        self.full_config = full_config or config
         self.device = device
         
         # 应用数据子集采样（如果配置了data_fraction）
@@ -82,6 +90,12 @@ class SupervisedTrainer:
         self.patience_counter = 0
         self.training_history = {'train_loss': [], 'val_loss': []}
         
+        # 初始化epoch信息加载器
+        self.epochinfo_loader = EpochInfoLoader()
+        self.eval_loader = None  # 将由外部设置
+        self.result_manager = None  # 将由外部设置
+        self.experiment_name = None  # 将由外部设置
+        
 
     
     def _create_optimizer(self):
@@ -124,17 +138,43 @@ class SupervisedTrainer:
             # 根据配置的打印间隔输出训练信息
             print_interval = self.config.get('print_interval', 10)
             
-            # 早停检查
+            # 早停检查和checkpoint保存
+            improvement = None
             if val_loss < self.best_val_loss:
                 improvement = self.best_val_loss - val_loss
                 self.best_val_loss = val_loss
                 self.patience_counter = 0
-                if epoch % print_interval == 0 or epoch == epochs - 1:
-                    print(f"   E{epoch+1:3d}/{epochs}: {train_loss:.4f}→{val_loss:.4f} ↓{improvement:.4f}")
+                
+                # 保存checkpoint（当val_loss改善时）
+                if self.result_manager and self.experiment_name:
+                    self.result_manager.save_checkpoint(
+                        self.experiment_name, self.model, self.optimizer, 
+                        epoch + 1, val_loss  # epoch+1因为从0开始计数
+                    )
             else:
                 self.patience_counter += 1
-                if epoch % print_interval == 0 or epoch == epochs - 1:
-                    print(f"   E{epoch+1:3d}/{epochs}: {train_loss:.4f}→{val_loss:.4f} ×{self.patience_counter}/{patience}")
+            
+            # 打印epoch信息（使用模块化系统）
+            if epoch % print_interval == 0 or epoch == epochs - 1:
+                epoch_data = {
+                    'epoch': epoch,
+                    'total_epochs': epochs,
+                    'train_loss': train_loss,
+                    'val_loss': val_loss,
+                    'improvement': improvement,
+                    'patience_counter': self.patience_counter,
+                    'patience': patience,
+                    'learning_rate': self.optimizer.param_groups[0]['lr'],
+                    # 提供计算准确率的方法，但不主动计算
+                    'trainer': self
+                }
+                
+                # 获取epoch信息模板配置
+                epochinfo_template = self.config.get('epochinfo', 'default')
+                # 设置eval_loader如果还没设置
+                if self.eval_loader and not self.epochinfo_loader.eval_loader:
+                    self.epochinfo_loader.eval_loader = self.eval_loader
+                self.epochinfo_loader.print_epoch_info(self.full_config, epochinfo_template, epoch_data)
             
             # 早停
             if self.patience_counter >= patience:
@@ -243,3 +283,20 @@ class SupervisedTrainer:
                 all_predictions.append(predictions.cpu().numpy())
         
         return np.concatenate(all_predictions)
+    
+    def _calculate_accuracy(self, X: np.ndarray, y: np.ndarray) -> float:
+        """
+        计算准确率
+        
+        Args:
+            X: 输入数据
+            y: 真实标签
+            
+        Returns:
+            准确率
+        """
+        predictions = self.predict(X)
+        # 确保y是numpy数组而不是tensor
+        if hasattr(y, 'cpu'):
+            y = y.cpu().numpy()
+        return float(np.mean(predictions == y))

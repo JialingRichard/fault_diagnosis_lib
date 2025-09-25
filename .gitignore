@@ -79,3 +79,6 @@ benchmark/data/
 data/
 *.npy
 *.npz
+
+# Results directory - ignore experiment outputs
+benchmark/results/

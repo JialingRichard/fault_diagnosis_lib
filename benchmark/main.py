@@ -23,6 +23,7 @@ from src.data_loader import DataLoader
 from src.model_loader import ModelLoader
 from src.training_loader import TrainingLoader
 from src.eval_loader import EvalLoader
+from src.result_manager import ResultManager
 
 def setup_logging():
     """设置日志系统"""
@@ -57,8 +58,9 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
         print(f"   {i}. {exp['name']} ({exp['model']} on {exp['dataset']})")
     print()
     
-    # 2. 初始化加载器
+    # 2. 初始化系统组件（包括结果管理器）
     print("步骤 2: 初始化系统组件")
+    result_manager = ResultManager(config_file)
     data_loader = DataLoader()
     model_loader = ModelLoader()
     training_loader = TrainingLoader()
@@ -71,7 +73,12 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     
     for exp_idx, experiment in enumerate(experiments, 1):
         print(f"\n{'='*20} 实验 {exp_idx}/{len(experiments)}: {experiment['name']} {'='*20}")
-        print(f"{experiment['model']} | {experiment['dataset']} | {experiment['training']}")
+        
+        # 获取训练配置中的epochinfo信息
+        training_config = config['training_templates'][experiment['training']]
+        epochinfo_name = training_config.get('epochinfo', 'default')
+        
+        print(f"Model:{experiment['model']} | Data:{experiment['dataset']} | Train:{experiment['training']} | Epoch:{epochinfo_name} | Eval:{experiment['evaluation']}")
         print("-" * 80)
         
         try:
@@ -95,6 +102,10 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                 config, experiment['training'], model,
                 X_train, y_train, X_test, y_test
             )
+            # 设置eval_loader和result_manager给训练器
+            trainer.eval_loader = eval_loader
+            trainer.result_manager = result_manager
+            trainer.experiment_name = experiment['name']
             training_results = trainer.train()
             
             # 3.4 评估
@@ -105,6 +116,16 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             actual_y_train = training_results.get('actual_y_train', y_train)
             actual_X_test = training_results.get('actual_X_test', X_test)
             actual_y_test = training_results.get('actual_y_test', y_test)
+            
+            # 为绘图evaluator设置plots目录
+            plots_dir = result_manager.get_experiment_plot_dir(experiment['name'])
+            
+            # 设置绘图evaluator的路径（如果存在的话）
+            try:
+                from evaluators.plot_label_distribution import set_plots_dir
+                set_plots_dir(str(plots_dir))
+            except ImportError:
+                pass  # 如果模块不存在就忽略
             
             eval_results = eval_loader.evaluate(
                 config, experiment['evaluation'],

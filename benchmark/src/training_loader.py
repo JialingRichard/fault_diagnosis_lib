@@ -78,7 +78,8 @@ class TrainingLoader:
             X_train=X_train,
             y_train=y_train,
             X_test=X_test,
-            y_test=y_test
+            y_test=y_test,
+            full_config=config  # 传递完整配置
         )
         
         logger.debug(f"训练器创建成功，类型: {training_type}")

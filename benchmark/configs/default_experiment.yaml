@@ -115,8 +115,10 @@ experiments:
 
 # 评估配置模板
 evaluation_templates:
+  nothing:
+    metrics:
+    
   default:
-    auto_threshold: true
     metrics:
       f1:
         # 默认：evaluators/f1.py 的 evaluate 函数
@@ -132,7 +134,6 @@ evaluation_templates:
       train_test_gap:
         file: sklearn_metrics
         function: train_test_gap_evaluate
-    tolerance: 0
 
 
 # 输出配置

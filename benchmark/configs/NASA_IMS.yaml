@@ -59,8 +59,9 @@ training_templates:
     lr: 0.001
     patience: 10
     optimizer: 'adam'
-    print_interval: 10  # 每10轮打印一次训练信息
+    print_interval: 5  # 每10轮打印一次训练信息
     data_fraction: 1.0  # 使用100%的数据集（默认值）
+    epochinfo: 'nothing'  # 显示训练和验证准确率
   
   supervised_fast:
     type: supervised
@@ -71,6 +72,7 @@ training_templates:
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印（用于快速调试）
     data_fraction: 0.1  # 只使用10%的数据集，用于快速测试流程
+    epochinfo: 'with_metrics'  # 使用集成评估指标的epoch信息打印格式
   
   supervised_debug:
     type: supervised
@@ -81,6 +83,7 @@ training_templates:
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印
     data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
+    epochinfo: 'with_metrics'  # 使用集成评估指标的epoch信息打印格式
   
   # self_supervised:
   #   type: self_supervised  # 自监督学习训练
@@ -139,10 +142,17 @@ experiments:
   #   evaluation: "default"
 
 
+# Epoch信息打印配置模板
+epochinfo_templates:
+  nothing:
+      metrics:
+        # 空评估器，不计算任何指标
+  with_metrics:
+    evaluation: 'default'  # 使用evaluation_templates中的default模板计算指标
+
 # 评估配置模板
 evaluation_templates:
   default:
-    auto_threshold: true
     metrics:
       f1:
         # 默认：evaluators/f1.py 的 evaluate 函数
@@ -158,13 +168,15 @@ evaluation_templates:
       train_test_gap:
         file: sklearn_metrics
         function: train_test_gap_evaluate
-    tolerance: 0
+      test_samples:
+        file: plot_label_distribution  # 使用 plot_label_distribution.py
+        function: evaluate  # 会生成标签分布图
 
 
-# 输出配置
-output:
-  generate_plots: true
-  results_dir: ./results
-  save_models: false
-  save_results: true
-  comparison_report: true
+# 输出配置 (当前仅支持控制台输出)
+# output:
+#   generate_plots: false    # 未实现
+#   results_dir: ./results   # 未实现  
+#   save_models: false       # 未实现
+#   save_results: false      # 未实现
+#   comparison_report: true  # 控制台输出，无文件保存
