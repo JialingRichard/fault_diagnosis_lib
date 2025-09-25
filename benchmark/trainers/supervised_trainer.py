@@ -43,11 +43,14 @@ class SupervisedTrainer:
         self.X_test = torch.FloatTensor(X_test).to(device)
         self.y_test = torch.LongTensor(y_test.flatten()).to(device)
         
+        # 存储训练参数
+        self.batch_size = config.get('batch_size', 32)
+        
         # 创建数据加载器
         train_dataset = TensorDataset(self.X_train, self.y_train)
         self.train_loader = DataLoader(
             train_dataset, 
-            batch_size=config.get('batch_size', 32),
+            batch_size=self.batch_size,
             shuffle=True
         )
         
@@ -165,34 +168,56 @@ class SupervisedTrainer:
         return total_loss / len(self.train_loader)
     
     def _validate(self) -> float:
-        """验证模型"""
+        """验证模型 - 使用批处理避免OOM"""
         self.model.eval()
         total_loss = 0.0
+        batch_count = 0
+        
+        # 创建验证数据加载器
+        val_dataset = torch.utils.data.TensorDataset(self.X_test, self.y_test)
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, 
+            batch_size=self.batch_size,  # 使用相同的batch_size
+            shuffle=False
+        )
         
         with torch.no_grad():
-            outputs = self.model(self.X_test)
-            
-            # 对于序列输出，需要reshape
-            if len(outputs.shape) == 3:
-                outputs = outputs.reshape(-1, outputs.shape[-1])
-                y_test = self.y_test.repeat_interleave(outputs.shape[0] // self.y_test.shape[0])
-            else:
-                y_test = self.y_test
-            
-            loss = self.criterion(outputs, y_test)
-            total_loss = loss.item()
+            for batch_X, batch_y in val_loader:
+                outputs = self.model(batch_X)
+                
+                # 对于序列输出，需要reshape
+                if len(outputs.shape) == 3:
+                    outputs = outputs.reshape(-1, outputs.shape[-1])
+                    batch_y = batch_y.repeat_interleave(outputs.shape[0] // batch_y.shape[0])
+                
+                loss = self.criterion(outputs, batch_y)
+                total_loss += loss.item()
+                batch_count += 1
         
-        return total_loss
+        return total_loss / batch_count if batch_count > 0 else 0.0
     
     def predict(self, X: torch.Tensor) -> np.ndarray:
-        """生成预测"""
+        """生成预测 - 使用批处理避免OOM"""
         self.model.eval()
+        all_predictions = []
+        
+        # 创建数据加载器进行批处理预测
+        dataset = torch.utils.data.TensorDataset(X)
+        data_loader = torch.utils.data.DataLoader(
+            dataset, 
+            batch_size=self.batch_size,
+            shuffle=False
+        )
+        
         with torch.no_grad():
-            outputs = self.model(X)
-            
-            # 对于序列输出，取最后一个时间步或平均
-            if len(outputs.shape) == 3:  # (batch, seq, features)
-                outputs = outputs[:, -1, :]  # 取最后一个时间步
-            
-            predictions = torch.argmax(outputs, dim=1)
-            return predictions.cpu().numpy()
+            for (batch_X,) in data_loader:
+                outputs = self.model(batch_X)
+                
+                # 对于序列输出，取最后一个时间步或平均
+                if len(outputs.shape) == 3:  # (batch, seq, features)
+                    outputs = outputs[:, -1, :]  # 取最后一个时间步
+                
+                predictions = torch.argmax(outputs, dim=1)
+                all_predictions.append(predictions.cpu().numpy())
+        
+        return np.concatenate(all_predictions)

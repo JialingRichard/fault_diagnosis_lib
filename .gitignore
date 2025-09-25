@@ -73,3 +73,9 @@ dmypy.json
 
 # Custom
 temp_data_prepare
+
+# Data directories - ignore large datasets
+benchmark/data/
+data/
+*.npy
+*.npz

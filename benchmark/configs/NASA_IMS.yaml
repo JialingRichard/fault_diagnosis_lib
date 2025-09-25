@@ -1,0 +1,152 @@
+# 全局设备设置
+device: 'cuda'
+# 实验配置信息
+experiment_info:
+  author: Benchmark Team
+  date: '2025-09-24'
+  description: 多模型多数据集对比实验框架
+  version: '2.0'
+
+# 数据集定义 - 支持多个数据集
+datasets:
+  NPY_UCI_HAR:
+    train_data: ./data/NPY_UCI_HAR/train_X.npy
+    train_label: ./data/NPY_UCI_HAR/train_y.npy
+    test_data: ./data/NPY_UCI_HAR/test_X.npy
+    test_label: ./data/NPY_UCI_HAR/test_y.npy
+    preprocessing:
+      normalize: true
+      # fill_missing: true
+      # remove_outliers: false
+      # stride: 1
+      # window_size: 10
+  
+  NASA_IMS:
+    train_data: ./data/NASA_IMS/train_X.npy
+    train_label: ./data/NASA_IMS/train_y.npy
+    test_data: ./data/NASA_IMS/test_X.npy
+    test_label: ./data/NASA_IMS/test_y.npy
+    preprocessing:
+      normalize: false  # NASA IMS数据已经是合理范围，不需要归一化
+
+# 模型定义 - 支持多个模型
+models:
+  LSTM:
+    # 纯模型架构参数
+    hidden_dim: 64
+    num_layers: 2
+    dropout: 0.2
+    # class: LSTM11  # 可选：如果类名和配置名不同，用此字段指定具体类名
+  
+  CNN:
+    # CNN模型参数
+    num_filters: 64
+    filter_sizes: [3, 5, 7]
+    num_layers: 3
+    dropout: 0.2
+  
+  # GRU:
+  #   hidden_dim: 128
+  #   num_layers: 3
+  #   dropout: 0.1
+
+# 训练参数模板 - 支持多种训练方式
+training_templates:
+  supervised_default:
+    type: supervised  # 监督学习训练
+    batch_size: 64     # 恢复正常batch_size，验证器已修复OOM问题
+    epochs: 100
+    lr: 0.001
+    patience: 10
+    optimizer: 'adam'
+    print_interval: 10  # 每10轮打印一次训练信息
+  
+  supervised_fast:
+    type: supervised
+    batch_size: 128
+    epochs: 10
+    lr: 0.001
+    patience: 2
+    optimizer: 'adam'
+    print_interval: 1   # 每轮都打印（用于快速调试）
+  
+  # self_supervised:
+  #   type: self_supervised  # 自监督学习训练
+  #   batch_size: 64
+  #   epochs: 200
+  #   lr: 0.0001
+  #   mask_ratio: 0.15
+  #   contrastive_temperature: 0.07
+  #   optimizer: 'adam'
+  
+  # adversarial:
+  #   type: adversarial  # 对抗训练
+  #   batch_size: 128
+  #   epochs: 150
+  #   lr: 0.001
+  #   adversarial_epsilon: 0.1
+  #   attack_method: 'fgsm'
+  #   optimizer: 'adam'
+
+# 实验定义 - 支持多个实验
+experiments:
+  - name: "LSTM_NASA_IMS_baseline"
+    model: "LSTM"
+    dataset: "NASA_IMS"
+    training: "supervised_fast"
+    evaluation: "default"
+
+  - name: "LSTM_NPY_UCI_HAR_baseline"
+    model: "LSTM"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_default"
+    evaluation: "default"
+    
+  - name: "CNN_NPY_UCI_HAR_baseline"
+    model: "CNN"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_default"
+    evaluation: "default"
+    
+  # - name: "LSTM_NASA_IMS_baseline"
+  #   model: "LSTM"
+  #   dataset: "NASA_IMS" 
+  #   training: "supervised_default"
+  #   evaluation: "default"
+  #
+  # - name: "GRU_NPY_UCI_HAR_baseline"
+  #   model: "GRU"
+  #   dataset: "NPY_UCI_HAR"
+  #   training: "supervised_default"
+  #   evaluation: "default"
+
+
+# 评估配置模板
+evaluation_templates:
+  default:
+    auto_threshold: true
+    metrics:
+      f1:
+        # 默认：evaluators/f1.py 的 evaluate 函数
+      precision:
+        file: sklearn_metrics  # 使用 sklearn_metrics.py
+        function: precision_evaluate  # 调用 precision_evaluate 函数
+      recall:
+        file: sklearn_metrics
+        function: recall_evaluate
+      accuracy:
+        file: sklearn_metrics
+        function: accuracy_evaluate
+      train_test_gap:
+        file: sklearn_metrics
+        function: train_test_gap_evaluate
+    tolerance: 0
+
+
+# 输出配置
+output:
+  generate_plots: true
+  results_dir: ./results
+  save_models: false
+  save_results: true
+  comparison_report: true
