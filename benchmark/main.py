@@ -122,8 +122,10 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             
             # 设置绘图evaluator的路径（如果存在的话）
             try:
-                from evaluators.plot_label_distribution import set_plots_dir
+                from evaluators.plot_label_distribution import set_plots_dir, clear_epoch_info
                 set_plots_dir(str(plots_dir))
+                # 清除epoch信息，这样最终评估的图片会保存到主plots目录
+                clear_epoch_info()
             except ImportError:
                 pass  # 如果模块不存在就忽略
             
@@ -167,33 +169,71 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     print("=" * 80)
     
     if results_summary:
-        # 表头
-        print(f"{'实验名称':<25} {'模型':<8} {'参数量':<10} {'轮数':<6} {'验证损失':<10} {'F1':<8} {'准确率':<8}")
-        print("-" * 80)
-        
-        # 结果行
+        # 按数据集分组
+        dataset_groups = {}
         for result in results_summary:
-            f1_score = result['eval_results'].get('f1', 0)
-            accuracy = result['eval_results'].get('accuracy', 0)
-            
-            params = result.get('parameters', 0) or 0  # 处理None值
-            epochs = result.get('epochs', 0) or 0  # 处理None值
-            val_loss = result.get('val_loss', 0) or 0  # 处理None值
-            
-            print(f"{result['name']:<25} {result['model']:<8} {params:<10,} "
-                  f"{epochs:<6} {val_loss:<10.4f} "
-                  f"{f1_score:<8.4f} {accuracy:<8.4f}")
+            dataset = result['dataset']
+            if dataset not in dataset_groups:
+                dataset_groups[dataset] = []
+            dataset_groups[dataset].append(result)
         
-        print()
-        
-        # 最佳结果
-        if len(results_summary) > 1:
-            best_f1 = max(results_summary, key=lambda x: x['eval_results'].get('f1', 0))
-            best_acc = max(results_summary, key=lambda x: x['eval_results'].get('accuracy', 0))
+        # 为每个数据集生成单独的对比表
+        for dataset, results in dataset_groups.items():
+            print(f"\n数据集: {dataset}")
+            print("-" * 60)
             
-            print("最佳结果:")
-            print(f"   最高 F1: {best_f1['name']} (F1: {best_f1['eval_results'].get('f1', 0):.4f})")
-            print(f"   最高准确率: {best_acc['name']} (准确率: {best_acc['eval_results'].get('accuracy', 0):.4f})")
+            # 动态获取所有可用的评估指标
+            all_metrics = set()
+            for result in results:
+                if 'eval_results' in result and result['eval_results']:
+                    all_metrics.update(result['eval_results'].keys())
+            
+            # 排序指标名称，保证一致的显示顺序
+            sorted_metrics = sorted(all_metrics)
+            
+            # 动态生成表头
+            header = f"{'实验名称':<25} {'模型':<8} {'参数量':<10} {'轮数':<6} {'val_loss':<10}"
+            for metric in sorted_metrics:
+                header += f" {metric:<10}"
+            print(header)
+            print("-" * len(header))
+            
+            # 结果行
+            for result in results:
+                params = result.get('parameters', 0) or 0
+                epochs = result.get('epochs', 0) or 0  
+                val_loss = result.get('val_loss', 0) or 0
+                
+                row = f"{result['name']:<25} {result['model']:<8} {params:<10,} " \
+                      f"{epochs:<6} {val_loss:<10.4f}"
+                
+                # 动态添加所有评估指标
+                for metric in sorted_metrics:
+                    value = result['eval_results'].get(metric, 0) if result.get('eval_results') else 0
+                    if isinstance(value, (int, float)):
+                        row += f" {value:<10.4f}"
+                    else:
+                        row += f" {'N/A':<10}"
+                
+                print(row)
+            
+            # 该数据集的最佳结果
+            if len(results) > 1:
+                print(f"\n{dataset}数据集最佳结果:")
+                
+                # 为每个指标找出最佳结果（排除test_samples等非性能指标）
+                performance_metrics = [m for m in sorted_metrics 
+                                     if m not in ['test_samples', 'train_test_gap']]
+                
+                for metric in performance_metrics:
+                    # 找到该指标的最高值
+                    best_result = max(results, 
+                                    key=lambda x: x['eval_results'].get(metric, 0) 
+                                    if x.get('eval_results') else 0)
+                    best_value = best_result['eval_results'].get(metric, 0) if best_result.get('eval_results') else 0
+                    
+                    if isinstance(best_value, (int, float)) and best_value > 0:
+                        print(f"   最高 {metric}: {best_result['name']} ({metric}: {best_value:.4f})")
     else:
         print("没有成功完成的实验")
     

@@ -83,7 +83,18 @@ training_templates:
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印
     data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
-    epochinfo: 'with_metrics'  # 使用集成评估指标的epoch信息打印格式
+    epochinfo: 'nothing'  # 不显示额外的评估指标
+  
+  supervised_debug_with_metrics:
+    type: supervised
+    batch_size: 64
+    epochs: 3
+    lr: 0.001
+    patience: 2
+    optimizer: 'adam'
+    print_interval: 1   # 每轮都打印
+    data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
+    epochinfo: 'with_metrics'  # 显示训练过程中的评估指标和图片
   
   # self_supervised:
   #   type: self_supervised  # 自监督学习训练
@@ -145,8 +156,7 @@ experiments:
 # Epoch信息打印配置模板
 epochinfo_templates:
   nothing:
-      metrics:
-        # 空评估器，不计算任何指标
+    format: 'default'  # 只显示基本的epoch信息（训练损失、验证损失）
   with_metrics:
     evaluation: 'default'  # 使用evaluation_templates中的default模板计算指标
 

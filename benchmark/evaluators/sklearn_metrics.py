@@ -14,17 +14,17 @@ def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
 
 def f1_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
     """F1分数评估"""
-    return f1_score(y_test.flatten(), y_test_pred.flatten(), average='macro')
+    return f1_score(y_test.flatten(), y_test_pred.flatten(), average='macro', zero_division=0)
 
 
 def precision_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
     """精确率评估"""
-    return precision_score(y_test.flatten(), y_test_pred.flatten(), average='macro')
+    return precision_score(y_test.flatten(), y_test_pred.flatten(), average='macro', zero_division=0)
 
 
 def recall_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
     """召回率评估"""
-    return recall_score(y_test.flatten(), y_test_pred.flatten(), average='macro')
+    return recall_score(y_test.flatten(), y_test_pred.flatten(), average='macro', zero_division=0)
 
 
 def accuracy_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):

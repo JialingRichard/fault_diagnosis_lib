@@ -49,8 +49,18 @@ def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
     # 这里我们需要获取当前实验的plots目录路径
     # 由于evaluate函数无法直接访问result_manager，我们使用一个全局变量来传递路径
     plots_dir = getattr(evaluate, '_plots_dir', None)
+    epoch_info = getattr(evaluate, '_epoch_info', None)
+    
     if plots_dir:
-        plot_path = os.path.join(plots_dir, 'test_label_distribution.png')
+        if epoch_info is not None:
+            # 训练过程中：保存到epochinfo子目录，按epoch命名
+            epochinfo_dir = os.path.join(plots_dir, 'epochinfo')
+            os.makedirs(epochinfo_dir, exist_ok=True)
+            plot_path = os.path.join(epochinfo_dir, f'test_label_distribution_epoch_{epoch_info["epoch"]+1:03d}.png')
+        else:
+            # 最终评估：保存到主plots目录
+            plot_path = os.path.join(plots_dir, 'test_label_distribution.png')
+        
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
         print(f"标签分布图已保存: {plot_path}")
     else:
@@ -65,3 +75,13 @@ def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
 def set_plots_dir(plots_dir):
     """设置plots目录路径的辅助函数"""
     evaluate._plots_dir = plots_dir
+
+
+def set_epoch_info(epoch_info):
+    """设置epoch信息的辅助函数（用于训练过程中的图片命名）"""
+    evaluate._epoch_info = epoch_info
+
+
+def clear_epoch_info():
+    """清除epoch信息（用于最终评估时）"""
+    evaluate._epoch_info = None
