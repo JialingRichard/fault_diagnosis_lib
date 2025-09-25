@@ -101,19 +101,24 @@ class SupervisedTrainer:
             self.training_history['train_loss'].append(train_loss)
             self.training_history['val_loss'].append(val_loss)
             
+            # 根据配置的打印间隔输出训练信息
+            print_interval = self.config.get('print_interval', 10)
+            
             # 早停检查
             if val_loss < self.best_val_loss:
+                improvement = self.best_val_loss - val_loss
                 self.best_val_loss = val_loss
                 self.patience_counter = 0
+                if epoch % print_interval == 0 or epoch == epochs - 1:
+                    logger.info(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f} (改善 {improvement:.4f})")
             else:
                 self.patience_counter += 1
-            
-            if epoch % 10 == 0:
-                logger.info(f"Epoch {epoch}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+                if epoch % print_interval == 0 or epoch == epochs - 1:
+                    logger.info(f"Epoch {epoch+1}/{epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f} (无改善 {self.patience_counter}/{patience})")
             
             # 早停
             if self.patience_counter >= patience:
-                logger.info(f"早停触发，epoch: {epoch}")
+                logger.info(f"早停触发: 连续 {patience} 轮验证损失无改善，epoch: {epoch+1}")
                 break
         
         # 生成预测结果

@@ -57,6 +57,7 @@ training_templates:
     lr: 0.001
     patience: 10
     optimizer: 'adam'
+    print_interval: 10  # 每10轮打印一次训练信息
   
   supervised_fast:
     type: supervised
@@ -65,6 +66,7 @@ training_templates:
     lr: 0.01
     patience: 5
     optimizer: 'adam'
+    print_interval: 1   # 每轮都打印（用于快速调试）
   
   # self_supervised:
   #   type: self_supervised  # 自监督学习训练
