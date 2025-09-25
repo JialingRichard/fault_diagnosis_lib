@@ -95,7 +95,8 @@ if 'iforest' in config['models']:
     iforest_config = config['models']['iforest']
     model = ModelFactory.create_model('iforest', iforest_config)
     print("训练模型...")
-    model.fit(train_data, metadata)
+    # 传入metadata需使用关键字，避免被当作y_train
+    model.fit(train_data, metadata=metadata)
     print("生成预测...")
     anomaly_scores = model.predict_anomaly_score(test_data)
     print("评估性能...")
