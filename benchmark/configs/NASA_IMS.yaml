@@ -9,6 +9,14 @@ experiment_info:
 
 # 数据集定义 - 支持多个数据集
 datasets:
+  NASA_IMS:
+    train_data: ./data/NASA_IMS/train_X.npy
+    train_label: ./data/NASA_IMS/train_y.npy
+    test_data: ./data/NASA_IMS/test_X.npy
+    test_label: ./data/NASA_IMS/test_y.npy
+    preprocessing:
+      normalize: false  
+
   NPY_UCI_HAR:
     train_data: ./data/NPY_UCI_HAR/train_X.npy
     train_label: ./data/NPY_UCI_HAR/train_y.npy
@@ -38,13 +46,7 @@ datasets:
           function: "add_statistical_features"
           params: {}
   
-  NASA_IMS:
-    train_data: ./data/NASA_IMS/train_X.npy
-    train_label: ./data/NASA_IMS/train_y.npy
-    test_data: ./data/NASA_IMS/test_X.npy
-    test_label: ./data/NASA_IMS/test_y.npy
-    preprocessing:
-      normalize: false  
+
 
 # 模型定义 - 支持多个模型
 models:
