@@ -122,10 +122,14 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             
             # 设置绘图evaluator的路径（如果存在的话）
             try:
-                from evaluators.plot_label_distribution import set_plots_dir, clear_epoch_info
+                from evaluators.plot_label_distribution import set_plots_dir, clear_epoch_info, set_logging_level
                 set_plots_dir(str(plots_dir))
                 # 清除epoch信息，这样最终评估的图片会保存到主plots目录
                 clear_epoch_info()
+                # 设置最终评估的日志等级
+                training_config = config['training_templates'][experiment['training']]
+                logging_level = training_config.get('logging_level', 'normal')
+                set_logging_level(logging_level)
             except ImportError:
                 pass  # 如果模块不存在就忽略
             

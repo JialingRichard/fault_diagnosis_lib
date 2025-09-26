@@ -62,6 +62,36 @@ class SupervisedTrainer:
             
             print(f"   数据子集: {data_fraction:.1%} ({train_size:,}训练 + {test_size:,}测试)")
         
+        # 从训练集中划分验证集
+        validation_split = config.get('validation_split', 0.2)
+        if validation_split > 0.0 and validation_split < 1.0:
+            from sklearn.model_selection import train_test_split
+            
+            # 使用分层抽样保持类别分布
+            X_train_split, X_val, y_train_split, y_val = train_test_split(
+                X_train, y_train,
+                test_size=validation_split,
+                stratify=y_train.flatten(),
+                random_state=42
+            )
+            
+            train_samples = len(X_train_split)
+            val_samples = len(X_val)
+            print(f"   数据划分: {train_samples:,}训练 + {val_samples:,}验证 + {len(X_test):,}测试")
+            
+            # 更新训练数据为划分后的训练集
+            X_train = X_train_split
+            y_train = y_train_split
+            
+            # 设置验证集
+            self.X_val = torch.FloatTensor(X_val).to(device)
+            self.y_val = torch.LongTensor(y_val.flatten()).to(device)
+        else:
+            # 如果没有配置验证集划分，使用测试集作为验证集（保持原有行为）
+            print(f"   警告: 未配置validation_split，使用测试集作为验证集（可能导致数据泄露）")
+            self.X_val = torch.FloatTensor(X_test).to(device)
+            self.y_val = torch.LongTensor(y_test.flatten()).to(device)
+        
         # 数据转换
         self.X_train = torch.FloatTensor(X_train).to(device)
         self.y_train = torch.LongTensor(y_train.flatten()).to(device)
@@ -147,9 +177,11 @@ class SupervisedTrainer:
                 
                 # 保存checkpoint（当val_loss改善时）
                 if self.result_manager and self.experiment_name:
+                    logging_level = self.config.get('logging_level', 'normal')
                     self.result_manager.save_checkpoint(
                         self.experiment_name, self.model, self.optimizer, 
-                        epoch + 1, val_loss  # epoch+1因为从0开始计数
+                        epoch + 1, val_loss,  # epoch+1因为从0开始计数
+                        logging_level=logging_level
                     )
             else:
                 self.patience_counter += 1
@@ -230,13 +262,13 @@ class SupervisedTrainer:
         return total_loss / len(self.train_loader)
     
     def _validate(self) -> float:
-        """验证模型 - 使用批处理避免OOM"""
+        """验证模型 - 使用真正的验证集避免数据泄露"""
         self.model.eval()
         total_loss = 0.0
         batch_count = 0
         
-        # 创建验证数据加载器
-        val_dataset = torch.utils.data.TensorDataset(self.X_test, self.y_test)
+        # 创建验证数据加载器 - 使用真正的验证集
+        val_dataset = torch.utils.data.TensorDataset(self.X_val, self.y_val)
         val_loader = torch.utils.data.DataLoader(
             val_dataset, 
             batch_size=self.batch_size,  # 使用相同的batch_size

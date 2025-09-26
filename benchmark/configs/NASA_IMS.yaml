@@ -15,11 +15,28 @@ datasets:
     test_data: ./data/NPY_UCI_HAR/test_X.npy
     test_label: ./data/NPY_UCI_HAR/test_y.npy
     preprocessing:
-      normalize: true
-      # fill_missing: true
-      # remove_outliers: false
-      # stride: 1
-      # window_size: 10
+      steps:
+        - name: "normalize"
+          file: "normalizers"
+          function: "standard_normalize"
+          params: {}
+        
+        - name: "add_noise"
+          file: "noise_processors"
+          function: "add_gaussian_noise"
+          params: 
+            noise_level: 0.01
+        
+        - name: "remove_outliers"
+          file: "noise_processors"
+          function: "remove_outliers"
+          params:
+            threshold: 3.0
+        
+        - name: "feature_engineering"
+          file: "feature_engineering"
+          function: "add_statistical_features"
+          params: {}
   
   NASA_IMS:
     train_data: ./data/NASA_IMS/train_X.npy
@@ -27,7 +44,7 @@ datasets:
     test_data: ./data/NASA_IMS/test_X.npy
     test_label: ./data/NASA_IMS/test_y.npy
     preprocessing:
-      normalize: false  # NASA IMS数据已经是合理范围，不需要归一化
+      normalize: false  
 
 # 模型定义 - 支持多个模型
 models:
@@ -61,18 +78,22 @@ training_templates:
     optimizer: 'adam'
     print_interval: 5  # 每10轮打印一次训练信息
     data_fraction: 1.0  # 使用100%的数据集（默认值）
+    validation_split: 0.2  # 从训练集中划分20%作为验证集
+    logging_level: 'minimal'  # minimal: 只显示epoch信息 | normal: +重要事件 | verbose: 显示所有
     epochinfo: 'nothing'  # 显示训练和验证准确率
   
   supervised_fast:
     type: supervised
-    batch_size: 128
+    batch_size: 64
     epochs: 10
     lr: 0.001
     patience: 2
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印（用于快速调试）
-    data_fraction: 0.1  # 只使用10%的数据集，用于快速测试流程
-    epochinfo: 'with_metrics'  # 使用集成评估指标的epoch信息打印格式
+    data_fraction: 0.01  # 只使用10%的数据集，用于快速测试流程
+    validation_split: 0.2  # 从训练集中划分20%作为验证集
+    logging_level: 'verbose'  # 调试模式显示所有信息
+    epochinfo: 'nothing'  # 使用集成评估指标的epoch信息打印格式
   
   supervised_debug:
     type: supervised
@@ -83,7 +104,22 @@ training_templates:
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印
     data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
+    validation_split: 0.2  # 从训练集中划分20%作为验证集
+    logging_level: 'verbose'  # 调试模式显示所有信息
     epochinfo: 'nothing'  # 不显示额外的评估指标
+
+  supervised_complete:
+    type: supervised
+    batch_size: 64
+    epochs: 100
+    lr: 0.001
+    patience: 10
+    optimizer: 'adam'
+    print_interval: 10   # 每轮都打印
+    data_fraction: 1.0  # 使用100%的数据集
+    validation_split: 0.2  # 从训练集中划分20%作为验证集
+    logging_level: 'minimal'  # minimal: 只显示epoch信息 | normal: +重要事件 | verbose: 显示所有
+    epochinfo: 'with_metrics'  # 显示额外的评估指标
   
   supervised_debug_with_metrics:
     type: supervised
@@ -94,6 +130,8 @@ training_templates:
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印
     data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
+    validation_split: 0.2  # 从训练集中划分20%作为验证集
+    logging_level: 'normal'  # 显示重要事件但不过度冗余
     epochinfo: 'with_metrics'  # 显示训练过程中的评估指标和图片
   
   # self_supervised:
@@ -104,53 +142,33 @@ training_templates:
   #   mask_ratio: 0.15
   #   contrastive_temperature: 0.07
   #   optimizer: 'adam'
-  
-  # adversarial:
-  #   type: adversarial  # 对抗训练
-  #   batch_size: 128
-  #   epochs: 150
-  #   lr: 0.001
-  #   adversarial_epsilon: 0.1
-  #   attack_method: 'fgsm'
-  #   optimizer: 'adam'
+
 
 # 实验定义 - 支持多个实验
 experiments:
   - name: "LSTM_NASA_IMS_debug"
     model: "LSTM"
     dataset: "NASA_IMS"
-    training: "supervised_debug"
+    training: "supervised_fast"
     evaluation: "default"
     
-  # - name: "LSTM_NASA_IMS_baseline"
-  #   model: "LSTM"
-  #   dataset: "NASA_IMS"
-  #   training: "supervised_fast"
-  #   evaluation: "default"
+  - name: "CNN_NASA_IMS_debug"
+    model: "CNN"
+    dataset: "NASA_IMS"
+    training: "supervised_fast"
+    evaluation: "default"
 
   - name: "LSTM_NPY_UCI_HAR_baseline"
     model: "LSTM"
     dataset: "NPY_UCI_HAR"
-    training: "supervised_default"
+    training: "supervised_complete"
     evaluation: "default"
     
   - name: "CNN_NPY_UCI_HAR_baseline"
     model: "CNN"
     dataset: "NPY_UCI_HAR"
-    training: "supervised_default"
+    training: "supervised_complete"
     evaluation: "default"
-    
-  # - name: "LSTM_NASA_IMS_baseline"
-  #   model: "LSTM"
-  #   dataset: "NASA_IMS" 
-  #   training: "supervised_default"
-  #   evaluation: "default"
-  #
-  # - name: "GRU_NPY_UCI_HAR_baseline"
-  #   model: "GRU"
-  #   dataset: "NPY_UCI_HAR"
-  #   training: "supervised_default"
-  #   evaluation: "default"
 
 
 # Epoch信息打印配置模板

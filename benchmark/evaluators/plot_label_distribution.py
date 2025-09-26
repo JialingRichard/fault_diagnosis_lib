@@ -62,9 +62,15 @@ def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
             plot_path = os.path.join(plots_dir, 'test_label_distribution.png')
         
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-        print(f"标签分布图已保存: {plot_path}")
+        
+        # 根据日志等级决定是否显示保存信息
+        logging_level = getattr(evaluate, '_logging_level', 'normal')
+        if logging_level in ['normal', 'verbose']:
+            print(f"标签分布图已保存: {plot_path}")
     else:
-        print("警告: 无法获取plots目录路径，图像未保存")
+        logging_level = getattr(evaluate, '_logging_level', 'normal')
+        if logging_level in ['normal', 'verbose']:
+            print("警告: 无法获取plots目录路径，图像未保存")
     
     plt.close()  # 关闭图形以释放内存
     
@@ -85,3 +91,8 @@ def set_epoch_info(epoch_info):
 def clear_epoch_info():
     """清除epoch信息（用于最终评估时）"""
     evaluate._epoch_info = None
+
+
+def set_logging_level(logging_level):
+    """设置日志等级的辅助函数"""
+    evaluate._logging_level = logging_level

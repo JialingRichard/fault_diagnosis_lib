@@ -121,7 +121,8 @@ class ResultManager:
     
     def save_checkpoint(self, experiment_name: str, model: torch.nn.Module, 
                        optimizer: torch.optim.Optimizer, epoch: int, 
-                       val_loss: float, metrics: Dict[str, float] = None):
+                       val_loss: float, metrics: Dict[str, float] = None,
+                       logging_level: str = 'normal'):
         """保存checkpoint"""
         exp_dir = self.create_experiment_dir(experiment_name)
         checkpoint_dir = exp_dir / "checkpoints"
@@ -140,7 +141,10 @@ class ResultManager:
         }
         
         torch.save(checkpoint, checkpoint_path)
-        print(f"Checkpoint保存: {checkpoint_name}")
+        
+        # 根据日志等级决定是否显示
+        if logging_level in ['normal', 'verbose']:
+            print(f"Checkpoint保存: {checkpoint_name}")
         
         return checkpoint_path
     
