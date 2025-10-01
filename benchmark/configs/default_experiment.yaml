@@ -21,6 +21,12 @@ datasets:
       # stride: 1
       # window_size: 10
   
+  UCR2018_npy:
+    collection_path: "./data/UCR2018_npy"
+    preprocessing:
+      normalize: false
+
+  
   # NASA_IMS:
   #   train_data: ./data/NASA_IMS/train_X.npy
   #   train_label: ./data/NASA_IMS/train_y.npy
@@ -97,6 +103,12 @@ experiments:
   - name: "CNN_NPY_UCI_HAR_baseline"
     model: "CNN"
     dataset: "NPY_UCI_HAR"
+    training: "supervised_default"
+    evaluation: "default"
+
+  - name: "Collection_test"
+    model: "LSTM"
+    dataset_collection: "UCR2018_npy"
     training: "supervised_default"
     evaluation: "default"
     

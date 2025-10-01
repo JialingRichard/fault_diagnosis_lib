@@ -33,6 +33,79 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
+def expand_dataset_collections(config):
+    """
+    展开数据集合集为多个独立实验
+    
+    Args:
+        config: 原始配置
+    
+    Returns:
+        展开后的配置
+    """
+    from pathlib import Path
+    
+    expanded_experiments = []
+    
+    for experiment in config.get('experiments', []):
+        if 'dataset_collection' in experiment:
+            # 处理数据集合集
+            collection_name = experiment['dataset_collection']
+            
+            if collection_name not in config['datasets']:
+                print(f" 数据集合集 '{collection_name}' 不存在")
+                continue
+            
+            collection_config = config['datasets'][collection_name]
+            collection_path = Path(collection_config['collection_path'])
+            
+            if not collection_path.exists():
+                print(f"数据集合集路径不存在: {collection_path}")
+                continue
+            
+            # 发现子数据集
+            subdatasets = []
+            for sub_dir in collection_path.iterdir():
+                if sub_dir.is_dir():
+                    # 检查是否包含必需的.npy文件
+                    required_files = ['train_X.npy', 'train_y.npy', 'test_X.npy', 'test_y.npy']
+                    if all((sub_dir / f).exists() for f in required_files):
+                        subdatasets.append(sub_dir.name)
+            
+            if not subdatasets:
+                print(f" 数据集合集 '{collection_name}' 中未找到有效的子数据集")
+                continue
+            
+            print(f"发现数据集合集 '{collection_name}': {len(subdatasets)} 个子数据集")
+            print(f"   {', '.join(subdatasets)}")
+            
+            # 为每个子数据集创建数据集配置
+            for subdataset in subdatasets:
+                # 创建数据集配置
+                dataset_key = f"{collection_name}_{subdataset}"
+                config['datasets'][dataset_key] = {
+                    'train_data': f"{collection_config['collection_path']}/{subdataset}/train_X.npy",
+                    'train_label': f"{collection_config['collection_path']}/{subdataset}/train_y.npy", 
+                    'test_data': f"{collection_config['collection_path']}/{subdataset}/test_X.npy",
+                    'test_label': f"{collection_config['collection_path']}/{subdataset}/test_y.npy",
+                    'preprocessing': collection_config.get('preprocessing', {})
+                }
+                
+                # 创建实验配置
+                new_experiment = experiment.copy()
+                del new_experiment['dataset_collection']  # 移除collection字段
+                new_experiment['dataset'] = dataset_key
+                new_experiment['name'] = f"{experiment['name']}_{subdataset}"
+                
+                expanded_experiments.append(new_experiment)
+        else:
+            # 普通实验，直接添加
+            expanded_experiments.append(experiment)
+    
+    # 更新实验列表
+    config['experiments'] = expanded_experiments
+    return config
+
 def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     """
     运行完整的实验流程
@@ -52,10 +125,14 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     config_loader = ConfigLoader(config_file)
     config = config_loader.load_config()
     
+    # 1.5 展开数据集合集
+    config = expand_dataset_collections(config)
+    
     experiments = config.get('experiments', [])
     print(f"   发现 {len(experiments)} 个实验配置")
     for i, exp in enumerate(experiments, 1):
-        print(f"   {i}. {exp['name']} ({exp['model']} on {exp['dataset']})")
+        dataset_info = exp.get('dataset', 'N/A')
+        print(f"   {i}. {exp['name']} ({exp['model']} on {dataset_info})")
     print()
     
     # 2. 初始化系统组件（包括结果管理器）
@@ -89,9 +166,11 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             )
             print(f"数据: {X_train.shape[0]:,}训练+{X_test.shape[0]:,}测试 | 特征:{metadata.feature_dim} | 类别:{metadata.num_classes}")
             
-            # 模型加载
+            # 模型加载 - 修复：传递正确的output_dim（类别数量）
             model = model_loader.load_model_from_config(
-                experiment['model'], config, input_dim=metadata.feature_dim
+                experiment['model'], config, 
+                input_dim=metadata.feature_dim,
+                output_dim=metadata.num_classes  # 添加输出维度（类别数量）
             )
             param_count = sum(p.numel() for p in model.parameters())
             print(f"模型: {param_count:,}参数")

@@ -152,10 +152,14 @@ class ConfigLoader:
         
         # 验证每个实验的基本结构
         for exp in config['experiments']:
-            required_exp_fields = ['name', 'model', 'dataset']
+            required_exp_fields = ['name', 'model']
             for field in required_exp_fields:
                 if field not in exp:
                     raise ConfigValidationError(f"实验配置缺少 '{field}' 字段")
+            
+            # 检查dataset或dataset_collection
+            if 'dataset' not in exp and 'dataset_collection' not in exp:
+                raise ConfigValidationError(f"实验配置必须包含 'dataset' 或 'dataset_collection' 字段")
         
         # 基本验证：确保非空
         if not config['models']:

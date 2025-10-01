@@ -40,9 +40,10 @@ class ModelLoader:
         logger.debug(f"模型加载器初始化完成，模型目录: {self.models_dir}")
     
     def load_model_from_config(self, 
-                              model_name: str,
-                              config: Dict[str, Any],
-                              input_dim: int) -> nn.Module:
+                              model_name: str, 
+                              config: dict, 
+                              input_dim: int,
+                              output_dim: int = None) -> nn.Module:
         """根据配置加载模型 - 直接使用完整配置"""
         # 基本检查
         if 'models' not in config or model_name not in config['models']:
@@ -71,6 +72,10 @@ class ModelLoader:
         non_model_params = {'class'}  # 可以扩展：'module', 'pretrained_path' 等
         filtered_config = {k: v for k, v in model_config.items() 
                           if k not in non_model_params}
+        
+        # 如果提供了output_dim，添加到配置中
+        if output_dim is not None:
+            filtered_config['output_dim'] = output_dim
         
         model = model_class(input_dim=input_dim, **filtered_config)
         
