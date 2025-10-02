@@ -1,0 +1,60 @@
+# 简化的网格搜索测试配置
+device: 'cuda'
+
+experiment_info:
+  author: Test Team
+  date: '2025-10-02'
+  description: 简化网格搜索测试
+  version: '1.0'
+
+datasets:
+  NPY_UCI_HAR:
+    train_data: ./data/NPY_UCI_HAR/train_X.npy
+    train_label: ./data/NPY_UCI_HAR/train_y.npy
+    test_data: ./data/NPY_UCI_HAR/test_X.npy
+    test_label: ./data/NPY_UCI_HAR/test_y.npy
+    preprocessing:
+      steps:
+        - name: "normalize"
+          file: "normalizers"
+          function: "standard_normalize"
+
+models:
+  CNN:
+    num_filters: 64
+    filter_sizes: "{[3, 5], [3]}"  # 只测试2种配置
+    num_layers: "{2, 1}"  # 只测试2种配置
+    dropout: 0.2
+
+training_templates:
+  supervised_quick:
+    type: supervised
+    batch_size: 64
+    epochs: "{3, 2}"  # 快速测试
+    lr: "{0.001, 0.01}"  # 2种学习率
+    patience: 2
+    optimizer: 'adam'
+    print_interval: 1
+    data_fraction: 0.01  # 只使用1%的数据
+    validation_split: 0.2
+    logging_level: 'minimal'
+    epochinfo: 'nothing'
+
+experiments:
+  - name: "CNN_test"
+    model: "CNN"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_quick"
+    evaluation: "default"
+
+epochinfo_templates:
+  nothing:
+    format: 'default'
+
+evaluation_templates:
+  default:
+    metrics:
+      f1:
+      accuracy:
+        file: sklearn_metrics
+        function: accuracy_evaluate

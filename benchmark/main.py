@@ -106,6 +106,169 @@ def expand_dataset_collections(config):
     config['experiments'] = expanded_experiments
     return config
 
+def expand_grid_search(config):
+    """
+    展开网格搜索配置为多个独立实验
+    
+    支持在配置中使用集合语法 {val1, val2, val3} 来定义参数网格
+    只对相关实验应用相关参数组合
+    
+    Args:
+        config: 原始配置
+    
+    Returns:
+        展开后的配置
+    """
+    import itertools
+    import re
+    import ast
+    import copy
+    
+    def parse_grid_values(value):
+        """解析集合语法，返回值列表"""
+        if isinstance(value, str) and value.strip().startswith('{') and value.strip().endswith('}'):
+            # 移除外层的大括号
+            content = value.strip()[1:-1]
+            try:
+                # 尝试使用ast.literal_eval解析
+                parsed = ast.literal_eval(f"[{content}]")
+                return parsed
+            except:
+                # 如果失败，尝试简单的逗号分割
+                items = [item.strip() for item in content.split(',')]
+                parsed_items = []
+                for item in items:
+                    try:
+                        parsed_items.append(ast.literal_eval(item))
+                    except:
+                        parsed_items.append(item)
+                return parsed_items
+        return [value]
+    
+    def find_grid_params(obj, path=""):
+        """递归查找所有网格参数"""
+        grid_params = {}
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                current_path = f"{path}.{key}" if path else key
+                if isinstance(value, str) and value.strip().startswith('{') and value.strip().endswith('}'):
+                    grid_params[current_path] = parse_grid_values(value)
+                elif isinstance(value, dict):
+                    grid_params.update(find_grid_params(value, current_path))
+        return grid_params
+    
+    def set_nested_value(obj, path, value):
+        """设置嵌套字典中的值"""
+        keys = path.split('.')
+        current = obj
+        for key in keys[:-1]:
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+        current[keys[-1]] = value
+    
+    def is_param_relevant_to_experiment(param_path, experiment):
+        """判断参数是否与实验相关"""
+        # 模型参数：只影响使用该模型的实验
+        if param_path.startswith('models.'):
+            model_name = param_path.split('.')[1]
+            return experiment.get('model') == model_name
+        
+        # 训练模板参数：只影响使用该训练模板的实验
+        if param_path.startswith('training_templates.'):
+            template_name = param_path.split('.')[1]
+            return experiment.get('training') == template_name
+        
+        # 数据集参数：只影响使用该数据集的实验
+        if param_path.startswith('datasets.'):
+            dataset_name = param_path.split('.')[1]
+            return experiment.get('dataset') == dataset_name
+        
+        # 其他全局参数：影响所有实验
+        return True
+    
+    # 查找所有需要网格搜索的参数
+    grid_params = find_grid_params(config)
+    
+    if not grid_params:
+        return config
+    
+    print(f"发现网格搜索参数: {len(grid_params)} 个")
+    for param, values in grid_params.items():
+        print(f"   {param}: {len(values)} 个值 {values}")
+    
+    # 分别处理每个实验
+    final_experiments = []
+    
+    for experiment in config.get('experiments', []):
+        # 找到与当前实验相关的网格参数
+        relevant_params = {}
+        for param_path, values in grid_params.items():
+            if is_param_relevant_to_experiment(param_path, experiment):
+                relevant_params[param_path] = values
+        
+        if not relevant_params:
+            # 如果没有相关的网格参数，保持原实验不变
+            final_experiments.append(experiment)
+        else:
+            # 生成该实验的所有参数组合
+            param_names = list(relevant_params.keys())
+            param_values = list(relevant_params.values())
+            combinations = list(itertools.product(*param_values))
+            
+            # 为每个组合创建新的实验
+            for i, combination in enumerate(combinations, 1):
+                new_experiment = copy.deepcopy(experiment)
+                
+                # 生成包含参数值的描述性名称
+                param_desc = []
+                for param_name, param_value in zip(param_names, combination):
+                    # 简化参数名（去掉路径前缀）
+                    simple_name = param_name.split('.')[-1]
+                    # 格式化参数值
+                    if isinstance(param_value, list):
+                        # 统一处理列表：转为字符串并去掉空格和括号
+                        value_str = str(param_value).replace(" ", "").replace("[", "").replace("]", "").replace(",", "_")
+                    elif isinstance(param_value, float):
+                        value_str = f"{param_value:.0e}" if param_value < 0.01 else str(param_value)
+                    else:
+                        value_str = str(param_value)
+                    param_desc.append(f"{simple_name}_{value_str}")
+                
+                # 创建描述性的实验名称
+                param_suffix = "_".join(param_desc)
+                new_experiment['name'] = f"{experiment['name']}_grid_{param_suffix}"
+                
+                # 记录当前组合的参数值（用于后续应用）
+                new_experiment['_grid_params'] = dict(zip(param_names, combination))
+                
+                final_experiments.append(new_experiment)
+    
+    print(f"总共将生成 {len(final_experiments)} 个实验配置")
+    
+    # 创建最终配置
+    final_config = copy.deepcopy(config)
+    final_config['experiments'] = final_experiments
+    
+    # 清理网格搜索语法，保持原始值
+    for param_path in grid_params.keys():
+        original_values = grid_params[param_path]
+        set_nested_value(final_config, param_path, original_values[0])
+    
+    return final_config
+    
+    # 收集所有展开的实验
+    all_experiments = []
+    for i, expanded_config in enumerate(expanded_configs, 1):
+        for experiment in expanded_config.get('experiments', []):
+            # 为每个实验添加网格搜索参数信息（用于调试）
+            experiment['_grid_params'] = dict(zip(param_names, combinations[i-1]))
+            all_experiments.append(experiment)
+    
+    final_config['experiments'] = all_experiments
+    
+    return final_config
+
 def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     """
     运行完整的实验流程
@@ -127,6 +290,9 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     
     # 1.5 展开数据集合集
     config = expand_dataset_collections(config)
+    
+    # 1.6 展开网格搜索
+    config = expand_grid_search(config)
     
     experiments = config.get('experiments', [])
     print(f"   发现 {len(experiments)} 个实验配置")
@@ -159,16 +325,36 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
         print("-" * 80)
         
         try:
+            # 应用网格搜索参数（如果有的话）
+            if '_grid_params' in experiment:
+                import copy
+                def set_nested_value(obj, path, value):
+                    """设置嵌套字典中的值"""
+                    keys = path.split('.')
+                    current = obj
+                    for key in keys[:-1]:
+                        if key not in current:
+                            current[key] = {}
+                        current = current[key]
+                    current[keys[-1]] = value
+                
+                temp_config = copy.deepcopy(config)
+                for param_path, param_value in experiment['_grid_params'].items():
+                    set_nested_value(temp_config, param_path, param_value)
+                config_for_experiment = temp_config
+            else:
+                config_for_experiment = config
+            
             # 3.1 数据加载
             # 数据加载
             X_train, X_test, y_train, y_test, metadata = data_loader.prepare_data(
-                config, experiment['dataset']
+                config_for_experiment, experiment['dataset']
             )
             print(f"数据: {X_train.shape[0]:,}训练+{X_test.shape[0]:,}测试 | 特征:{metadata.feature_dim} | 类别:{metadata.num_classes}")
             
             # 模型加载 - 修复：传递正确的output_dim（类别数量）
             model = model_loader.load_model_from_config(
-                experiment['model'], config, 
+                experiment['model'], config_for_experiment, 
                 input_dim=metadata.feature_dim,
                 output_dim=metadata.num_classes  # 添加输出维度（类别数量）
             )
@@ -178,7 +364,7 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             # 开始训练
             print(f"开始训练...")
             trainer = training_loader.create_trainer(
-                config, experiment['training'], model,
+                config_for_experiment, experiment['training'], model,
                 X_train, y_train, X_test, y_test
             )
             # 设置eval_loader和result_manager给训练器

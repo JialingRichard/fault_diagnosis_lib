@@ -59,7 +59,11 @@ class CNN(nn.Module):
         # 中间卷积层
         conv_input_dim = num_filters * len(self.filter_sizes)
         self.middle_layers = nn.ModuleList()
-        for i in range(num_layers - 1):
+        
+        # 确保至少有一个中间层来处理维度转换
+        actual_middle_layers = max(1, num_layers - 1)
+        
+        for i in range(actual_middle_layers):
             layer = nn.Sequential(
                 nn.Conv1d(conv_input_dim, num_filters, kernel_size=3, padding=1),
                 nn.BatchNorm1d(num_filters),

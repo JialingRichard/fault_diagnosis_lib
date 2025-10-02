@@ -17,20 +17,6 @@ datasets:
     preprocessing:
       normalize: false  
 
-  UCR2018_npy:
-    collection_path: ./data/UCR2018_npy
-    preprocessing:
-      steps:
-        - name: "normalize"
-          file: "normalizers"
-          function: "standard_normalize"
-          params: {}
-  
-  MYDATA:
-    collection_path: ./data/MYDATA
-    preprocessing:
-      normalize: false
-
   NPY_UCI_HAR:
     train_data: ./data/NPY_UCI_HAR/train_X.npy
     train_label: ./data/NPY_UCI_HAR/train_y.npy
@@ -41,7 +27,6 @@ datasets:
         - name: "normalize"
           file: "normalizers"
           function: "standard_normalize"
-          params: {}
         
         - name: "add_noise"
           file: "noise_processors"
@@ -74,8 +59,8 @@ models:
   CNN:
     # CNN模型参数
     num_filters: 64
-    filter_sizes: [3, 5, 7]
-    num_layers: 3
+    filter_sizes: "{[3, 5, 7], [3, 5], [3]}"
+    num_layers: "{3, 2, 1}"
     dropout: 0.2
   
   # GRU:
@@ -101,8 +86,8 @@ training_templates:
   supervised_fast:
     type: supervised
     batch_size: 64
-    epochs: 10
-    lr: 0.001
+    epochs: "{10, 5}"
+    lr: "{0.001, 0.0001, 0.0005}"
     patience: 2
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印（用于快速调试）
@@ -119,35 +104,22 @@ training_templates:
     patience: 2
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印
-    data_fraction: 0.01  # 使用10%的数据集，避免数据太少
-    validation_split: 0.1  # 减少验证集比例到10%
+    data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
+    validation_split: 0.2  # 从训练集中划分20%作为验证集
     logging_level: 'verbose'  # 调试模式显示所有信息
-    epochinfo: 'nothing'  # 不显示额外的评估指标\
-
-  supervised_debug_full_dataset:
-    type: supervised
-    batch_size: 32
-    epochs: 200
-    lr: 0.0001
-    patience: 5
-    optimizer: 'adam'
-    print_interval: 5   
-    data_fraction: 1.0  # 修复：使用100%数据集
-    validation_split: 0.2
-    logging_level: 'minimal'  # 调试模式显示所有信息
     epochinfo: 'nothing'  # 不显示额外的评估指标
 
   supervised_complete:
     type: supervised
-    batch_size: 4  # 减小batch_size适应小数据集
-    epochs: 400     # 增加训练轮数
-    lr: 0.0001      # 降低学习率
-    patience: 10    # 增加patience
+    batch_size: 64
+    epochs: 100
+    lr: 0.001
+    patience: 10
     optimizer: 'adam'
-    print_interval: 5   
+    print_interval: 10   # 每轮都打印
     data_fraction: 1.0  # 使用100%的数据集
-    validation_split: 0.2  
-    logging_level: 'verbose'  
+    validation_split: 0.2  # 从训练集中划分20%作为验证集
+    logging_level: 'minimal'  # minimal: 只显示epoch信息 | normal: +重要事件 | verbose: 显示所有
     epochinfo: 'with_metrics'  # 显示额外的评估指标
   
   supervised_debug_with_metrics:
@@ -175,51 +147,27 @@ training_templates:
 
 # 实验定义 - 支持多个实验
 experiments:
-  # - name: "LSTM_NASA_IMS_debug"
-  #   model: "LSTM"
-  #   dataset: "NASA_IMS"
-  #   training: "supervised_complete"
-  #   evaluation: "default"
-    
-  # - name: "CNN_NASA_IMS_debug"
-  #   model: "CNN"
-  #   dataset: "NASA_IMS"
-  #   training: "supervised_complete"
-  #   evaluation: "default"
-
-  # - name: "LSTM_NPY_UCI_HAR_baseline"
-  #   model: "LSTM"
-  #   dataset: "NPY_UCI_HAR"
-  #   training: "supervised_complete"
-  #   evaluation: "default"
-    
-  # - name: "CNN_NPY_UCI_HAR_baseline"
-  #   model: "CNN"
-  #   dataset: "NPY_UCI_HAR"
-  #   training: "supervised_complete"
-  #   evaluation: "default"
-
-  # - name: "my_LSTM"
-  #   model: "LSTM"
-  #   dataset_collection: "MYDATA"
-  #   training: "supervised_complete"
-  #   evaluation: "default"
-
-  # - name: "my_CNN"
-  #   model: "CNN"
-  #   dataset_collection: "MYDATA"
-  #   training: "supervised_complete"
-  #   evaluation: "default"
-
-  - name: "Collection_test_LSTM"
+  - name: "LSTM_NASA_IMS_debug"
     model: "LSTM"
-    dataset_collection: "UCR2018_npy"
-    training: "supervised_complete"
+    dataset: "NASA_IMS"
+    training: "supervised_fast"
+    evaluation: "default"
+    
+  - name: "CNN_NASA_IMS_debug"
+    model: "CNN"
+    dataset: "NASA_IMS"
+    training: "supervised_fast"
     evaluation: "default"
 
-  - name: "Collection_test_CNN"
+  - name: "LSTM_NPY_UCI_HAR_baseline"
+    model: "LSTM"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_complete"
+    evaluation: "default"
+    
+  - name: "CNN_NPY_UCI_HAR_baseline"
     model: "CNN"
-    dataset_collection: "UCR2018_npy"
+    dataset: "NPY_UCI_HAR"
     training: "supervised_complete"
     evaluation: "default"
 
