@@ -356,7 +356,8 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             model = model_loader.load_model_from_config(
                 experiment['model'], config_for_experiment, 
                 input_dim=metadata.feature_dim,
-                output_dim=metadata.num_classes  # 添加输出维度（类别数量）
+                output_dim=metadata.num_classes,  # 添加输出维度（类别数量）
+                time_steps=X_train.shape[1] if len(X_train.shape) > 1 else None
             )
             param_count = sum(p.numel() for p in model.parameters())
             print(f"模型: {param_count:,}参数")
@@ -420,7 +421,13 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                 'parameters': param_count,
                 'epochs': training_results['total_epochs'],
                 'val_loss': training_results['final_val_loss'],
-                'eval_results': eval_results
+                'eval_results': eval_results,
+                # 添加数据集详细信息
+                'train_samples': X_train.shape[0],
+                'test_samples': X_test.shape[0],
+                'feature_dim': metadata.feature_dim,
+                'num_classes': metadata.num_classes,
+                'sequence_length': X_train.shape[1] if len(X_train.shape) > 1 else None
             })
             
             print(f"实验完成\n")
@@ -445,6 +452,9 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             if dataset not in dataset_groups:
                 dataset_groups[dataset] = []
             dataset_groups[dataset].append(result)
+        
+        # 准备导出数据
+        export_data = {}
         
         # 为每个数据集生成单独的对比表
         for dataset, results in dataset_groups.items():
@@ -503,6 +513,112 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                     
                     if isinstance(best_value, (int, float)) and best_value > 0:
                         print(f"   最高 {metric}: {best_result['name']} ({metric}: {best_value:.4f})")
+            
+            # 准备该数据集的导出数据
+            export_rows = []
+            for result in results:
+                row = {
+                    '实验名称': result['name'],
+                    '模型': result['model'],
+                    '训练样本数': result.get('train_samples', 0) or 0,
+                    '测试样本数': result.get('test_samples', 0) or 0,
+                    '特征维度': result.get('feature_dim', 0) or 0,
+                    '类别数量': result.get('num_classes', 0) or 0,
+                    '序列长度': result.get('sequence_length', 0) or 0,
+                    '参数量': result.get('parameters', 0) or 0,
+                    '轮数': result.get('epochs', 0) or 0,
+                    'val_loss': result.get('val_loss', 0) or 0
+                }
+                # 添加评估指标
+                for metric in sorted_metrics:
+                    value = result['eval_results'].get(metric, 0) if result.get('eval_results') else 0
+                    row[metric] = value if isinstance(value, (int, float)) else 0
+                export_rows.append(row)
+            
+            export_data[dataset] = export_rows
+        
+        # 导出到Excel文件
+        try:
+            import pandas as pd
+            from datetime import datetime
+            
+            # 使用实验运行目录（而不是results根目录）
+            results_dir = result_manager.run_dir
+            os.makedirs(results_dir, exist_ok=True)
+            
+            # 生成文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # 1. 按数据集分类的Excel文件
+            dataset_excel_filename = f"results_by_dataset_{timestamp}.xlsx"
+            dataset_excel_path = os.path.join(results_dir, dataset_excel_filename)
+            
+            with pd.ExcelWriter(dataset_excel_path, engine='openpyxl') as writer:
+                for dataset, rows in export_data.items():
+                    if rows:
+                        df = pd.DataFrame(rows)
+                        # 清理sheet名称（Excel sheet名称限制）
+                        clean_dataset_name = dataset.replace('/', '_').replace('\\', '_')
+                        sheet_name = clean_dataset_name[:31]
+                        df.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            # 2. 按模型分类的Excel文件
+            model_excel_filename = f"results_by_model_{timestamp}.xlsx"
+            model_excel_path = os.path.join(results_dir, model_excel_filename)
+            
+            # 准备按模型分类的数据
+            model_groups = {}
+            for result in results_summary:
+                model = result['model']
+                if model not in model_groups:
+                    model_groups[model] = []
+                model_groups[model].append(result)
+            
+            with pd.ExcelWriter(model_excel_path, engine='openpyxl') as writer:
+                for model, results in model_groups.items():
+                    if results:
+                        # 准备模型视图数据
+                        model_rows = []
+                        for result in results:
+                            dataset_name = result['dataset']
+                            
+                            row = {
+                                '数据集': dataset_name,
+                                '实验名称': result['name'],
+                                '训练样本数': result.get('train_samples', 0) or 0,
+                                '测试样本数': result.get('test_samples', 0) or 0,
+                                '特征维度': result.get('feature_dim', 0) or 0,
+                                '类别数量': result.get('num_classes', 0) or 0,
+                                '序列长度': result.get('sequence_length', 0) or 0,
+                                '参数量': result.get('parameters', 0) or 0,
+                                '训练轮数': result.get('epochs', 0) or 0,
+                                'val_loss': result.get('val_loss', 0) or 0
+                            }
+                            
+                            # 添加评估指标
+                            if result.get('eval_results'):
+                                for metric, value in result['eval_results'].items():
+                                    if isinstance(value, (int, float)):
+                                        row[metric] = value
+                                    else:
+                                        row[metric] = 0
+                            
+                            model_rows.append(row)
+                        
+                        # 创建模型的sheet
+                        df_model = pd.DataFrame(model_rows)
+                        sheet_name = model[:31]  # Excel sheet名称限制
+                        df_model.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            print(f"\n实验结果已导出到两个Excel文件:")
+            print(f"  按数据集分类: {dataset_excel_path}")
+            print(f"  按模型分类: {model_excel_path}")
+            
+        except ImportError:
+            print("\n警告: 无法导入pandas，跳过Excel导出功能")
+            print("请安装pandas: pip install pandas openpyxl")
+        except Exception as e:
+            print(f"\n警告: 导出Excel文件时出错: {str(e)}")
     else:
         print("没有成功完成的实验")
     

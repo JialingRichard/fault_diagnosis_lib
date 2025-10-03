@@ -43,7 +43,8 @@ class ModelLoader:
                               model_name: str, 
                               config: dict, 
                               input_dim: int,
-                              output_dim: int = None) -> nn.Module:
+                              output_dim: int = None,
+                              time_steps: int = None) -> nn.Module:
         """根据配置加载模型 - 直接使用完整配置"""
         # 基本检查
         if 'models' not in config or model_name not in config['models']:
@@ -61,7 +62,15 @@ class ModelLoader:
             # 确定模块名：配置中的module字段 或 默认使用model_name
             module_name = model_config.get('module', model_name)
             
-            module = importlib.import_module(f"models.{module_name}")
+            # 支持相对路径：如果module_name包含路径分隔符，直接使用；否则添加models.前缀
+            if '/' in module_name or '.' in module_name:
+                # 直接使用相对路径，将/转换为.
+                import_path = module_name.replace('/', '.')
+            else:
+                # 传统方式：添加models.前缀
+                import_path = f"models.{module_name}"
+            
+            module = importlib.import_module(import_path)
             model_class = getattr(module, class_name)
             self.model_registry[model_key] = {'class': model_class}
         
@@ -69,13 +78,15 @@ class ModelLoader:
         model_class = self.model_registry[model_key]['class']
         
         # 过滤配置参数：排除ModelLoader专用的元数据字段
-        non_model_params = {'class'}  # 可以扩展：'module', 'pretrained_path' 等
+        non_model_params = {'class', 'module'}  # 扩展：过滤module字段
         filtered_config = {k: v for k, v in model_config.items() 
                           if k not in non_model_params}
         
         # 如果提供了output_dim，添加到配置中
         if output_dim is not None:
             filtered_config['output_dim'] = output_dim
+        if time_steps is not None:
+            filtered_config['time_steps'] = time_steps
         
         model = model_class(input_dim=input_dim, **filtered_config)
         
