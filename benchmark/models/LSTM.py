@@ -210,7 +210,8 @@ class LSTM2one(nn.Module):
                  num_layers: int = 2,
                  dropout: float = 0.2,
                  output_dim: Optional[int] = None,
-                 pooling_method: str = "last"):
+                 pooling_method: str = "last",
+                 **kwargs):
         """
         初始化LSTM分类模型
         

@@ -433,8 +433,23 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             print(f"实验完成\n")
             
         except Exception as e:
+            # 构建错误日志信息，包含实验的完整上下文
+            error_info = f"{'='*20} 实验 {exp_idx}/{len(experiments)}: {experiment['name']} {'='*20}\n"
+            error_info += f"Model:{experiment['model']} | Data:{experiment['dataset']} | Train:{experiment['training']} | Epoch:{epochinfo_name} | Eval:{experiment['evaluation']}\n"
+            error_info += "-" * 80 + "\n"
+            
+            # 如果有数据信息，也包含进去
+            try:
+                if 'X_train' in locals() and 'X_test' in locals() and 'metadata' in locals():
+                    error_info += f"数据: {X_train.shape[0]:,}训练+{X_test.shape[0]:,}测试 | 特征:{metadata.feature_dim} | 类别:{metadata.num_classes}\n"
+            except:
+                pass
+            
             print(f"实验失败: {str(e)}")
             logging.error(f"实验失败: {experiment['name']}", exc_info=True)
+            
+            # 将错误信息写入error.log
+            result_manager.log_experiment_error(error_info, str(e))
             
         print()
     

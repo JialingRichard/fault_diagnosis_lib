@@ -39,6 +39,7 @@ class ResultManager:
         
         # 设置日志文件
         self.log_file = self.run_dir / "run.log"
+        self.error_log_file = self.run_dir / "error.log"
         self._setup_logging()
         
         # 保存配置快照
@@ -152,6 +153,16 @@ class ResultManager:
         """获取实验的plots目录"""
         exp_dir = self.create_experiment_dir(experiment_name)
         return exp_dir / "plots"
+    
+    def log_experiment_error(self, experiment_info: str, error_message: str):
+        """记录实验错误到error.log文件"""
+        try:
+            with open(self.error_log_file, 'a', encoding='utf-8') as f:
+                f.write(experiment_info)
+                f.write(f"实验失败: {error_message}\n\n")
+                f.flush()  # 实时写入
+        except Exception as e:
+            print(f"写入错误日志失败: {e}")
     
     def cleanup(self):
         """清理资源"""

@@ -45,7 +45,15 @@ datasets:
           file: "feature_engineering"
           function: "add_statistical_features"
           params: {}
-  
+
+  UCR2018_npy:
+    collection_path: ./data/UCR2018_npy
+    preprocessing:
+      steps:
+        - name: "normalize"
+          file: "normalizers"
+          function: "standard_normalize"
+          params: {}
 
 
 # 模型定义 - 支持多个模型
@@ -68,9 +76,9 @@ models:
   PatchTST:
     module: models/PatchTST/PatchTST_supervised/models/PatchTST_cls
     class: PatchTSTClassifier
-    patch_len: 16
+    patch_len: "{4, 16, 64}"
     stride: 8
-    d_model: 128
+    d_model: 64
     n_heads: 8
     n_layers: 3
     d_ff: 256
@@ -108,6 +116,19 @@ training_templates:
     logging_level: 'minimal'
     epochinfo: 'nothing'
 
+  classification_batch:
+    type: classification  # 分类任务训练
+    batch_size: 64
+    epochs: 100
+    lr: "{0.001, 0.0001}"
+    patience: 10
+    optimizer: 'adam'
+    print_interval: 1
+    data_fraction: 1.0 
+    validation_split: 0.2
+    logging_level: 'minimal'
+    epochinfo: 'with_metrics'
+
 experiments:
   # - name: "LSTM_NASA_IMS_classification_debug"
   #   model: "LSTM"
@@ -121,28 +142,46 @@ experiments:
   #   training: "classification_normal_fast"
   #   evaluation: "default"
 
-  - name: "LSTM_NPY_UCI_HAR_classification_fast"
-    model: "LSTM"
-    dataset: "NPY_UCI_HAR"
-    training: "classification_normal"
-    evaluation: "default"
+  # - name: "LSTM_NPY_UCI_HAR_classification_fast"
+  #   model: "LSTM"
+  #   dataset: "NPY_UCI_HAR"
+  #   training: "classification_normal"
+  #   evaluation: "default"
     
-  - name: "CNN_NPY_UCI_HAR_classification_fast"
+  # - name: "CNN_NPY_UCI_HAR_classification_fast"
+  #   model: "CNN"
+  #   dataset: "NPY_UCI_HAR"
+  #   training: "classification_normal"
+  #   evaluation: "default"
+
+  # - name: "PatchTST_NASA_IMS_classification"
+  #   model: "PatchTST"
+  #   dataset: "NASA_IMS"
+  #   training: "classification_normal_fast"
+  #   evaluation: "default"
+
+  # - name: "PatchTST_NPY_UCI_HAR_classification"
+  #   model: "PatchTST"
+  #   dataset: "NPY_UCI_HAR"
+  #   training: "classification_normal"
+  #   evaluation: "default"
+
+  - name: "LSTM"
+    model: "LSTM"
+    dataset_collection: "UCR2018_npy"
+    training: "classification_batch"
+    evaluation: "default"
+
+  - name: "CNN"
     model: "CNN"
-    dataset: "NPY_UCI_HAR"
-    training: "classification_normal"
+    dataset_collection: "UCR2018_npy"
+    training: "classification_batch"
     evaluation: "default"
 
-  - name: "PatchTST_NASA_IMS_classification"
+  - name: "PatchTST"
     model: "PatchTST"
-    dataset: "NASA_IMS"
-    training: "classification_normal_fast"
-    evaluation: "default"
-
-  - name: "PatchTST_NPY_UCI_HAR_classification"
-    model: "PatchTST"
-    dataset: "NPY_UCI_HAR"
-    training: "classification_normal"
+    dataset_collection: "UCR2018_npy"
+    training: "classification_batch"
     evaluation: "default"
 
 
@@ -151,7 +190,7 @@ epochinfo_templates:
   nothing:
     format: 'default'  # 只显示基本的epoch信息（训练损失、验证损失）
   with_metrics:
-    evaluation: 'default'  # 使用evaluation_templates中的default模板计算指标
+    evaluation: 'ACC'  # 使用evaluation_templates中的ACC模板计算指标
 
 # 评估配置模板
 evaluation_templates:
@@ -174,3 +213,9 @@ evaluation_templates:
       test_samples:
         file: plot_label_distribution  # 使用 plot_label_distribution.py
         function: evaluate  # 会生成标签分布图
+
+  ACC:
+    metrics:
+      accuracy:
+        file: sklearn_metrics
+        function: accuracy_evaluate

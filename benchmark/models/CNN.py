@@ -145,7 +145,8 @@ class CNN2one(nn.Module):
                  num_layers: int = 3,
                  dropout: float = 0.2,
                  output_dim: Optional[int] = None,
-                 pooling_method: str = 'last'):
+                 pooling_method: str = 'last',
+                 **kwargs):
         """
         初始化CNN分类模型
         
