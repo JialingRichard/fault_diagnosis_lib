@@ -7,14 +7,32 @@
 
 TO DO:
 1. 自动参数寻优 done
-2. csv文件格式数据集兼容
-3. 设置全局seed
-4. 扩展模型
-5. 扩展数据集
-6. 兼容sequence2sequence格式模型 to do
-7. 直接集成论文中的模型
+2. csv文件格式数据集兼容 to do
+3. 设置全局seed to do
+4. 扩展模型 todo
+5. 扩展数据集 todo
+6. 兼容sequence2sequence格式模型 done
+7. 直接集成论文中的模型 patchTST
 8. excel输出格式 done
 
 
 3. 兼容同数据集不同evaluation方式（不确定）
 7. 兼容单/多输出回归，时序预测功能（不确定）
+
+进度：
+===========================
+1. 批量导入和训练数据集
+2. 集成patchTST
+3. grid search完成
+4. 结果格式改善（新增错误日志， excel表格分类）
+5. 新增trainer进行不同训练模式
+
+目前模型： LSTM/CNN/PatchTST 缺少sota模型
+数据集: UCR2018(128), UCI_HAR, NASA_IMS 缺少故障诊断领域数据集
+
+1. comforamal learning + welding 
+2. pipeline to english
+3. LLM 记录 done
+4. 周四, am 11.30 会议
+
+
