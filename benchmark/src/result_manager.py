@@ -73,36 +73,71 @@ class ResultManager:
         return run_dir
     
     def _setup_logging(self):
-        """设置实时日志记录"""
-        # 创建自定义处理器，同时输出到控制台和文件
-        class TeeHandler(logging.Handler):
-            def __init__(self, log_file):
-                super().__init__()
-                self.console = logging.StreamHandler(sys.stdout)
-                self.file = logging.FileHandler(log_file, mode='a', encoding='utf-8')
-                
-            def emit(self, record):
-                self.console.emit(record)
-                self.file.emit(record)
-                self.file.flush()  # 实时写入
-        
-        # 重定向print输出
+        """设置实时日志记录与多文件分级输出"""
+        # 1) 捕获 warnings 到 logging
+        logging.captureWarnings(True)
+
+        # 2) 重定向 print 到主运行日志（run.log）
         class TeeStream:
             def __init__(self, log_file):
                 self.terminal = sys.stdout
                 self.log_file = open(log_file, 'a', encoding='utf-8')
-                
+
             def write(self, message):
                 self.terminal.write(message)
                 self.log_file.write(message)
                 self.log_file.flush()  # 实时写入
-                
+
             def flush(self):
                 self.terminal.flush()
                 self.log_file.flush()
-        
-        # 替换stdout以捕获所有print输出
+
         sys.stdout = TeeStream(self.log_file)
+
+        # 3) 统一配置 root logger（DEBUG 级别，具体输出由各 Handler 控制）
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+
+        # 避免重复添加 handler（在重复初始化时）
+        existing = {type(h).__name__ + getattr(h, 'baseFilename', '') for h in root_logger.handlers}
+
+        # 控制台输出（INFO+），显示到当前 stdout（已被 Tee 包装，从而同时写 run.log）
+        has_stdout_handler = any(
+            isinstance(h, logging.StreamHandler) and getattr(h, 'stream', None) is sys.stdout
+            for h in root_logger.handlers
+        )
+        if not has_stdout_handler:
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(logging.Formatter(
+                fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            ))
+            root_logger.addHandler(console_handler)
+
+        # Debug 明细日志：写入 debug.log（DEBUG+ 全量，不影响控制台）
+        debug_log_path = self.run_dir / 'debug.log'
+        debug_handler = logging.FileHandler(debug_log_path, mode='a', encoding='utf-8')
+        debug_handler.setLevel(logging.DEBUG)
+        debug_handler.setFormatter(logging.Formatter(
+            fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
+        key_debug = type(debug_handler).__name__ + str(debug_log_path)
+        if key_debug not in existing:
+            root_logger.addHandler(debug_handler)
+
+        # 错误日志：写入 error.log（ERROR+）
+        error_log_path = self.run_dir / 'error.log'
+        error_handler = logging.FileHandler(error_log_path, mode='a', encoding='utf-8')
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(logging.Formatter(
+            fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
+        key_error = type(error_handler).__name__ + str(error_log_path)
+        if key_error not in existing:
+            root_logger.addHandler(error_handler)
     
     def _save_config_snapshot(self, config_file: str):
         """保存配置文件快照"""
@@ -143,10 +178,10 @@ class ResultManager:
         
         torch.save(checkpoint, checkpoint_path)
         
-        # 根据日志等级决定是否显示
-        if logging_level in ['normal', 'verbose']:
+        # 根据日志等级决定是否显示（仅在 verbose 下提示，避免干扰epoch单行输出）
+        if logging_level in ['verbose']:
             print(f"Checkpoint保存: {checkpoint_name}")
-        
+
         return checkpoint_path
     
     def get_experiment_plot_dir(self, experiment_name: str) -> Path:
@@ -163,6 +198,31 @@ class ResultManager:
                 f.flush()  # 实时写入
         except Exception as e:
             print(f"写入错误日志失败: {e}")
+
+    def log_experiment_timing(self, name: str, start_ts: float, end_ts: float, extra: Dict[str, Any] | None = None):
+        """记录实验起止时间与耗时到 CSV（timings.csv）"""
+        import time, csv
+        timings_csv = self.run_dir / 'timings.csv'
+        exists = timings_csv.exists()
+        duration = max(0.0, end_ts - start_ts)
+        row = {
+            'experiment': name,
+            'start_time': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_ts)),
+            'end_time': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_ts)),
+            'duration_sec': f"{duration:.3f}"
+        }
+        if extra:
+            # 扁平附加信息（如显存、样本量）
+            for k, v in extra.items():
+                row[str(k)] = v
+        try:
+            with open(timings_csv, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+                if not exists:
+                    writer.writeheader()
+                writer.writerow(row)
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"写入timings.csv失败: {e}")
     
     def cleanup(self):
         """清理资源"""

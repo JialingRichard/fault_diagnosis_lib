@@ -197,19 +197,16 @@ class EpochInfoLoader:
                     # 调用评估器计算指标（静默模式）
                     eval_template_name = epochinfo_template['evaluation']
                     
-                                                            # 为绘图evaluator设置plots目录
+                    # 为评估器设置上下文（plots目录、epoch信息、日志等级）
                     if hasattr(trainer, 'result_manager') and trainer.result_manager:
-                        try:
-                            from evaluators.plot_label_distribution import set_plots_dir, set_epoch_info, set_logging_level
-                            plots_dir = trainer.result_manager.get_experiment_plot_dir(trainer.experiment_name)
-                            set_plots_dir(str(plots_dir))
-                            # 传递epoch信息用于文件命名
-                            set_epoch_info(epoch_data)
-                            # 传递日志等级
-                            logging_level = trainer.config.get('logging_level', 'normal')
-                            set_logging_level(logging_level)
-                        except ImportError:
-                            pass  # 如果没有plot_label_distribution模块则忽略
+                        plots_dir = trainer.result_manager.get_experiment_plot_dir(trainer.experiment_name)
+                        logging_level = trainer.config.get('logging_level', 'normal')
+                        # 设置epoch上下文，图像会保存到epochinfo子目录
+                        self.eval_loader.set_context(
+                            plots_dir=plots_dir,
+                            epoch_info=epoch_data,  # 传递epoch信息，图像会保存到epochinfo/子目录
+                            logging_level=logging_level
+                        )
                     
                     # 临时禁用日志
                     original_level = logging.getLogger('src.eval_loader').level

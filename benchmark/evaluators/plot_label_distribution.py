@@ -1,12 +1,14 @@
 """
 Plot Label Distribution 评估器
-绘制测试集标签分布图并保存到plots目录
+绘制测试集标签分布图
+
+返回: (Figure对象, 测试样本总数)
+由 EvalLoader 负责根据上下文保存图像
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
-import os
 
 
 def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
@@ -18,14 +20,15 @@ def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
         X_test, y_test, y_test_pred: 测试集数据和预测
         
     Returns:
-        总的测试样本数（作为metric返回值）
+        tuple: (Figure对象, 测试样本总数)
+        Figure对象会被EvalLoader自动保存到合适的位置
     """
     # 计算标签分布
     y_test_flat = y_test.flatten()
     label_counts = Counter(y_test_flat)
     
     # 创建图像
-    plt.figure(figsize=(10, 6))
+    fig = plt.figure(figsize=(10, 6))
     
     # 绘制条形图
     labels = sorted(label_counts.keys())
@@ -46,53 +49,6 @@ def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
     # 调整布局
     plt.tight_layout()
     
-    # 这里我们需要获取当前实验的plots目录路径
-    # 由于evaluate函数无法直接访问result_manager，我们使用一个全局变量来传递路径
-    plots_dir = getattr(evaluate, '_plots_dir', None)
-    epoch_info = getattr(evaluate, '_epoch_info', None)
-    
-    if plots_dir:
-        if epoch_info is not None:
-            # 训练过程中：保存到epochinfo子目录，按epoch命名
-            epochinfo_dir = os.path.join(plots_dir, 'epochinfo')
-            os.makedirs(epochinfo_dir, exist_ok=True)
-            plot_path = os.path.join(epochinfo_dir, f'test_label_distribution_epoch_{epoch_info["epoch"]+1:03d}.png')
-        else:
-            # 最终评估：保存到主plots目录
-            plot_path = os.path.join(plots_dir, 'test_label_distribution.png')
-        
-        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-        
-        # 根据日志等级决定是否显示保存信息
-        logging_level = getattr(evaluate, '_logging_level', 'normal')
-        if logging_level in ['normal', 'verbose']:
-            print(f"标签分布图已保存: {plot_path}")
-    else:
-        logging_level = getattr(evaluate, '_logging_level', 'normal')
-        if logging_level in ['normal', 'verbose']:
-            print("警告: 无法获取plots目录路径，图像未保存")
-    
-    plt.close()  # 关闭图形以释放内存
-    
-    # 返回测试样本总数作为metric
-    return len(y_test_flat)
-
-
-def set_plots_dir(plots_dir):
-    """设置plots目录路径的辅助函数"""
-    evaluate._plots_dir = plots_dir
-
-
-def set_epoch_info(epoch_info):
-    """设置epoch信息的辅助函数（用于训练过程中的图片命名）"""
-    evaluate._epoch_info = epoch_info
-
-
-def clear_epoch_info():
-    """清除epoch信息（用于最终评估时）"""
-    evaluate._epoch_info = None
-
-
-def set_logging_level(logging_level):
-    """设置日志等级的辅助函数"""
-    evaluate._logging_level = logging_level
+    # 返回Figure对象和测试样本总数
+    # EvalLoader会自动处理图像保存（根据epoch_info判断保存位置）
+    return (fig, len(y_test_flat))

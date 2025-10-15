@@ -67,13 +67,27 @@ class SupervisedTrainer:
         if validation_split > 0.0 and validation_split < 1.0:
             from sklearn.model_selection import train_test_split
             
-            # 使用分层抽样保持类别分布
-            X_train_split, X_val, y_train_split, y_val = train_test_split(
-                X_train, y_train,
-                test_size=validation_split,
-                stratify=y_train.flatten(),
-                random_state=42
-            )
+            # 检查是否可以使用分层抽样（每个类至少2个样本）
+            y_flat = y_train.flatten()
+            unique_classes, class_counts = np.unique(y_flat, return_counts=True)
+            min_samples_per_class = class_counts.min()
+            
+            # 如果最少的类别样本数大于1，使用分层抽样；否则使用普通随机抽样
+            if min_samples_per_class > 1:
+                X_train_split, X_val, y_train_split, y_val = train_test_split(
+                    X_train, y_train,
+                    test_size=validation_split,
+                    stratify=y_flat,
+                    random_state=42
+                )
+                print(f"   使用分层抽样划分验证集")
+            else:
+                X_train_split, X_val, y_train_split, y_val = train_test_split(
+                    X_train, y_train,
+                    test_size=validation_split,
+                    random_state=42
+                )
+                print(f"   警告: 数据集类别样本过少（最少类别仅{min_samples_per_class}个样本），使用普通随机抽样划分验证集")
             
             train_samples = len(X_train_split)
             val_samples = len(X_val)
@@ -125,6 +139,7 @@ class SupervisedTrainer:
         self.eval_loader = None  # 将由外部设置
         self.result_manager = None  # 将由外部设置
         self.experiment_name = None  # 将由外部设置
+        self.best_checkpoint_path = None  # 记录最优checkpoint
         
 
     
@@ -178,11 +193,15 @@ class SupervisedTrainer:
                 # 保存checkpoint（当val_loss改善时）
                 if self.result_manager and self.experiment_name:
                     logging_level = self.config.get('logging_level', 'normal')
-                    self.result_manager.save_checkpoint(
+                    ckpt_path = self.result_manager.save_checkpoint(
                         self.experiment_name, self.model, self.optimizer, 
                         epoch + 1, val_loss,  # epoch+1因为从0开始计数
                         logging_level=logging_level
                     )
+                    try:
+                        self.best_checkpoint_path = ckpt_path
+                    except Exception:
+                        self.best_checkpoint_path = None
             else:
                 self.patience_counter += 1
             
@@ -207,12 +226,25 @@ class SupervisedTrainer:
                 if self.eval_loader and not self.epochinfo_loader.eval_loader:
                     self.epochinfo_loader.eval_loader = self.eval_loader
                 self.epochinfo_loader.print_epoch_info(self.full_config, epochinfo_template, epoch_data)
+
+                # 本轮打印完成
             
             # 早停
             if self.patience_counter >= patience:
                 print(f"   早停: {patience}轮无改善 @E{epoch+1}")
                 break
         
+        # 如配置要求：使用最优checkpoint进行最终评估
+        load_best = self.config.get('load_best_checkpoint_for_eval', True)
+        selected_checkpoint = None
+        if load_best and self.best_checkpoint_path is not None:
+            try:
+                checkpoint = torch.load(self.best_checkpoint_path, map_location=self.device)
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                selected_checkpoint = str(self.best_checkpoint_path)
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"加载最佳checkpoint失败，将使用当前模型: {e}")
+
         # 生成预测结果
         train_pred = self.predict(self.X_train)
         test_pred = self.predict(self.X_test)
@@ -225,6 +257,7 @@ class SupervisedTrainer:
             'training_history': self.training_history,
             'train_predictions': train_pred,
             'test_predictions': test_pred,
+            'selected_checkpoint': selected_checkpoint,
             # 返回实际使用的数据用于评估
             'actual_X_train': self.X_train.cpu().numpy(),
             'actual_y_train': self.y_train.cpu().numpy(),

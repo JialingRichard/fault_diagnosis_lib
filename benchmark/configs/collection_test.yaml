@@ -65,14 +65,15 @@ datasets:
 # 模型定义 - 支持多个模型
 models:
   LSTM:
-    # 纯模型架构参数
+    module: models/LSTM    # 清晰的相对路径
+    class: LSTM2one        # 使用分类模型
     hidden_dim: 64
     num_layers: 2
     dropout: 0.2
-    # class: LSTM11  # 可选：如果类名和配置名不同，用此字段指定具体类名
-  
+
   CNN:
-    # CNN模型参数
+    module: models/CNN     # 清晰的相对路径
+    class: CNN2one         # 使用分类模型
     num_filters: 64
     filter_sizes: [3, 5, 7]
     num_layers: 3
@@ -139,12 +140,12 @@ training_templates:
 
   supervised_complete:
     type: supervised
-    batch_size: 4  # 减小batch_size适应小数据集
-    epochs: 400     # 增加训练轮数
+    batch_size: 32  # 减小batch_size适应小数据集
+    epochs: 100     # 增加训练轮数
     lr: 0.0001      # 降低学习率
     patience: 10    # 增加patience
     optimizer: 'adam'
-    print_interval: 5   
+    print_interval: 1   
     data_fraction: 1.0  # 使用100%的数据集
     validation_split: 0.2  
     logging_level: 'verbose'  

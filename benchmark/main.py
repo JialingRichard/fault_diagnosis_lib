@@ -325,6 +325,9 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
         print("-" * 80)
         
         try:
+            import time
+            exp_start_ts = time.time()
+            print(f"实验开始时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(exp_start_ts))}")
             # 应用网格搜索参数（如果有的话）
             if '_grid_params' in experiment:
                 import copy
@@ -376,6 +379,10 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             
             # 3.4 评估
             print(f"开始评估...")
+            # 如有记录，打印本次评估所用的最佳checkpoint
+            sel_ckpt = training_results.get('selected_checkpoint')
+            if sel_ckpt:
+                print(f"使用最佳checkpoint进行最终评估: {sel_ckpt}")
             
             # 使用训练器实际使用的数据进行评估（可能是子集）
             actual_X_train = training_results.get('actual_X_train', X_train)
@@ -386,18 +393,14 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             # 为绘图evaluator设置plots目录
             plots_dir = result_manager.get_experiment_plot_dir(experiment['name'])
             
-            # 设置绘图evaluator的路径（如果存在的话）
-            try:
-                from evaluators.plot_label_distribution import set_plots_dir, clear_epoch_info, set_logging_level
-                set_plots_dir(str(plots_dir))
-                # 清除epoch信息，这样最终评估的图片会保存到主plots目录
-                clear_epoch_info()
-                # 设置最终评估的日志等级
-                training_config = config['training_templates'][experiment['training']]
-                logging_level = training_config.get('logging_level', 'normal')
-                set_logging_level(logging_level)
-            except ImportError:
-                pass  # 如果模块不存在就忽略
+            # 设置评估器上下文（用于图像保存等）
+            training_config = config['training_templates'][experiment['training']]
+            logging_level = training_config.get('logging_level', 'normal')
+            eval_loader.set_context(
+                plots_dir=plots_dir,
+                epoch_info=None,  # None表示最终评估，会保存到主plots目录
+                logging_level=logging_level
+            )
             
             eval_results = eval_loader.evaluate(
                 config, experiment['evaluation'],
@@ -430,6 +433,25 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                 'sequence_length': X_train.shape[1] if len(X_train.shape) > 1 else None
             })
             
+            # 记录实验结束时间与耗时、资源占用
+            exp_end_ts = time.time()
+            extra_timing = {}
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    extra_timing['cuda_max_mem_MiB'] = int(torch.cuda.max_memory_allocated() / (1024 * 1024))
+            except Exception:
+                pass
+            try:
+                # 样本量等信息
+                extra_timing.update({
+                    'train_samples': X_train.shape[0],
+                    'test_samples': X_test.shape[0]
+                })
+            except Exception:
+                pass
+            result_manager.log_experiment_timing(experiment['name'], exp_start_ts, exp_end_ts, extra=extra_timing)
+            print(f"实验结束时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(exp_end_ts))} | 耗时: {exp_end_ts - exp_start_ts:.1f}s")
             print(f"实验完成\n")
             
         except Exception as e:
@@ -450,6 +472,13 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             
             # 将错误信息写入error.log
             result_manager.log_experiment_error(error_info, str(e))
+            try:
+                import time
+                exp_end_ts = time.time()
+                result_manager.log_experiment_timing(experiment['name'], exp_start_ts, exp_end_ts, extra={'failed': True})
+                print(f"实验结束时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(exp_end_ts))} | 耗时: {exp_end_ts - exp_start_ts:.1f}s")
+            except Exception:
+                pass
             
         print()
     

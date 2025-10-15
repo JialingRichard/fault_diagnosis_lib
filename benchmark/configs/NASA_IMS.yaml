@@ -51,78 +51,48 @@ datasets:
 # 模型定义 - 支持多个模型
 models:
   LSTM:
-    # 纯模型架构参数
-    hidden_dim: 64
-    num_layers: 2
+    module: models/LSTM    # 清晰的相对路径
+    class: LSTM2one        # 使用分类模型
+    hidden_dim: "{64, 128}"
+    num_layers: "{2, 3}"
     dropout: 0.2
-    # class: LSTM11  # 可选：如果类名和配置名不同，用此字段指定具体类名
-  
+
   CNN:
-    # CNN模型参数
+    module: models/CNN     # 清晰的相对路径
+    class: CNN2one         # 使用分类模型
     num_filters: 64
-    filter_sizes: [3, 5, 7]
-    num_layers: 3
+    filter_sizes: "{[3, 5, 7], [3, 5], [3]}"
+    num_layers: "{3, 2, 1}"
     dropout: 0.2
-  
-  # GRU:
-  #   hidden_dim: 128
-  #   num_layers: 3
-  #   dropout: 0.1
+
+# 实验定义 - 支持多个实验
+experiments:
+  - name: "LSTM_NASA_IMS_debug"
+    model: "LSTM"
+    dataset: "NASA_IMS"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    
+  - name: "CNN_NASA_IMS_debug"
+    model: "CNN"
+    dataset: "NASA_IMS"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+
+  - name: "LSTM_NPY_UCI_HAR_baseline"
+    model: "LSTM"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    
+  - name: "CNN_NPY_UCI_HAR_baseline"
+    model: "CNN"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
 
 # 训练参数模板 - 支持多种训练方式
 training_templates:
-  supervised_default:
-    type: supervised  # 监督学习训练
-    batch_size: 64     # 恢复正常batch_size，验证器已修复OOM问题
-    epochs: 100
-    lr: 0.001
-    patience: 10
-    optimizer: 'adam'
-    print_interval: 5  # 每10轮打印一次训练信息
-    data_fraction: 1.0  # 使用100%的数据集（默认值）
-    validation_split: 0.2  # 从训练集中划分20%作为验证集
-    logging_level: 'minimal'  # minimal: 只显示epoch信息 | normal: +重要事件 | verbose: 显示所有
-    epochinfo: 'nothing'  # 显示训练和验证准确率
-  
-  supervised_fast:
-    type: supervised
-    batch_size: 64
-    epochs: 10
-    lr: 0.001
-    patience: 2
-    optimizer: 'adam'
-    print_interval: 1   # 每轮都打印（用于快速调试）
-    data_fraction: 0.01  # 只使用10%的数据集，用于快速测试流程
-    validation_split: 0.2  # 从训练集中划分20%作为验证集
-    logging_level: 'verbose'  # 调试模式显示所有信息
-    epochinfo: 'nothing'  # 使用集成评估指标的epoch信息打印格式
-  
-  supervised_debug:
-    type: supervised
-    batch_size: 64
-    epochs: 3
-    lr: 0.001
-    patience: 2
-    optimizer: 'adam'
-    print_interval: 1   # 每轮都打印
-    data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
-    validation_split: 0.2  # 从训练集中划分20%作为验证集
-    logging_level: 'verbose'  # 调试模式显示所有信息
-    epochinfo: 'nothing'  # 不显示额外的评估指标
-
-  supervised_complete:
-    type: supervised
-    batch_size: 64
-    epochs: 100
-    lr: 0.001
-    patience: 10
-    optimizer: 'adam'
-    print_interval: 10   # 每轮都打印
-    data_fraction: 1.0  # 使用100%的数据集
-    validation_split: 0.2  # 从训练集中划分20%作为验证集
-    logging_level: 'minimal'  # minimal: 只显示epoch信息 | normal: +重要事件 | verbose: 显示所有
-    epochinfo: 'with_metrics'  # 显示额外的评估指标
-  
   supervised_debug_with_metrics:
     type: supervised
     batch_size: 64
@@ -135,43 +105,6 @@ training_templates:
     validation_split: 0.2  # 从训练集中划分20%作为验证集
     logging_level: 'normal'  # 显示重要事件但不过度冗余
     epochinfo: 'with_metrics'  # 显示训练过程中的评估指标和图片
-  
-  # self_supervised:
-  #   type: self_supervised  # 自监督学习训练
-  #   batch_size: 64
-  #   epochs: 200
-  #   lr: 0.0001
-  #   mask_ratio: 0.15
-  #   contrastive_temperature: 0.07
-  #   optimizer: 'adam'
-
-
-# 实验定义 - 支持多个实验
-experiments:
-  - name: "LSTM_NASA_IMS_debug"
-    model: "LSTM"
-    dataset: "NASA_IMS"
-    training: "supervised_fast"
-    evaluation: "default"
-    
-  - name: "CNN_NASA_IMS_debug"
-    model: "CNN"
-    dataset: "NASA_IMS"
-    training: "supervised_fast"
-    evaluation: "default"
-
-  - name: "LSTM_NPY_UCI_HAR_baseline"
-    model: "LSTM"
-    dataset: "NPY_UCI_HAR"
-    training: "supervised_complete"
-    evaluation: "default"
-    
-  - name: "CNN_NPY_UCI_HAR_baseline"
-    model: "CNN"
-    dataset: "NPY_UCI_HAR"
-    training: "supervised_complete"
-    evaluation: "default"
-
 
 # Epoch信息打印配置模板
 epochinfo_templates:
@@ -203,10 +136,3 @@ evaluation_templates:
         function: evaluate  # 会生成标签分布图
 
 
-# 输出配置 (当前仅支持控制台输出)
-# output:
-#   generate_plots: false    # 未实现
-#   results_dir: ./results   # 未实现  
-#   save_models: false       # 未实现
-#   save_results: false      # 未实现
-#   comparison_report: true  # 控制台输出，无文件保存
