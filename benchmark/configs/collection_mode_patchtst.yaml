@@ -101,7 +101,12 @@ training_templates:
     data_fraction: 1.0  # 只使用1%的数据集，用于快速测试
     validation_split: 0.2
     logging_level: 'minimal'
-    epochinfo: 'nothing'
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'ACC'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
   
   classification_normal_fast:
     type: classification  # 分类任务训练
@@ -114,7 +119,12 @@ training_templates:
     data_fraction: 0.01  # 只使用1%的数据集，用于快速测试
     validation_split: 0.2
     logging_level: 'minimal'
-    epochinfo: 'nothing'
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'ACC'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
 
   classification_batch:
     type: classification  # 分类任务训练
@@ -127,7 +137,12 @@ training_templates:
     data_fraction: 1.0 
     validation_split: 0.2
     logging_level: 'minimal'
-    epochinfo: 'with_metrics'
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'ACC'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
 
 experiments:
   # - name: "LSTM_NASA_IMS_classification_debug"

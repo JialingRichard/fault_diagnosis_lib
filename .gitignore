@@ -77,8 +77,11 @@ temp_data_prepare
 # Data directories - ignore large datasets
 benchmark/data/
 data/
-*.npy
-*.npz
+# *.npy
+# *.npz
 
 # Results directory - ignore experiment outputs
 benchmark/results/
+
+!benchmark/data/UCR_subset/
+!benchmark/data/UCR_subset/**

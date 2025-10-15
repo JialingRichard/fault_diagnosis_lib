@@ -97,7 +97,12 @@ training_templates:
     data_fraction: 1.0  # 使用100%的数据集（默认值）
     validation_split: 0.2  # 从训练集中划分20%作为验证集
     logging_level: 'minimal'  # minimal: 只显示epoch信息 | normal: +重要事件 | verbose: 显示所有
-    epochinfo: 'nothing'  # 显示训练和验证准确率
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'train_acc'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
   
   supervised_fast:
     type: supervised
@@ -110,7 +115,12 @@ training_templates:
     data_fraction: 0.01  # 只使用10%的数据集，用于快速测试流程
     validation_split: 0.2  # 从训练集中划分20%作为验证集
     logging_level: 'verbose'  # 调试模式显示所有信息
-    epochinfo: 'nothing'  # 使用集成评估指标的epoch信息打印格式
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'train_acc'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
   
   supervised_debug:
     type: supervised
@@ -123,7 +133,12 @@ training_templates:
     data_fraction: 0.01  # 使用10%的数据集，避免数据太少
     validation_split: 0.1  # 减少验证集比例到10%
     logging_level: 'verbose'  # 调试模式显示所有信息
-    epochinfo: 'nothing'  # 不显示额外的评估指标\
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'train_acc'  
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
 
   supervised_debug_full_dataset:
     type: supervised
@@ -136,7 +151,12 @@ training_templates:
     data_fraction: 1.0  # 修复：使用100%数据集
     validation_split: 0.2
     logging_level: 'minimal'  # 调试模式显示所有信息
-    epochinfo: 'nothing'  # 不显示额外的评估指标
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'train_acc'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
 
   supervised_complete:
     type: supervised
@@ -149,7 +169,12 @@ training_templates:
     data_fraction: 1.0  # 使用100%的数据集
     validation_split: 0.2  
     logging_level: 'verbose'  
-    epochinfo: 'with_metrics'  # 显示额外的评估指标
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'train_acc'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
   
   supervised_debug_with_metrics:
     type: supervised
@@ -162,7 +187,12 @@ training_templates:
     data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
     validation_split: 0.2  # 从训练集中划分20%作为验证集
     logging_level: 'normal'  # 显示重要事件但不过度冗余
-    epochinfo: 'with_metrics'  # 显示训练过程中的评估指标和图片
+    # 与训练器严格对齐：显式训练期评估与监控
+    epochinfo: 'train_acc'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
   
   # self_supervised:
   #   type: self_supervised  # 自监督学习训练
@@ -238,6 +268,26 @@ evaluation_templates:
     metrics:
       f1:
         # 默认：evaluators/f1.py 的 evaluate 函数
+      precision:
+        file: sklearn_metrics  # 使用 sklearn_metrics.py
+        function: precision_evaluate  # 调用 precision_evaluate 函数
+      recall:
+        file: sklearn_metrics
+        function: recall_evaluate
+      accuracy:
+        file: sklearn_metrics
+        function: accuracy_evaluate
+      train_test_gap:
+        file: sklearn_metrics
+        function: train_test_gap_evaluate
+      test_samples:
+        file: plot_label_distribution  # 使用 plot_label_distribution.py
+        function: evaluate  # 会生成标签分布图
+  # 训练期轻量模板：仅 accuracy（供 epochinfo 与 monitor 使用）
+  train_acc:
+    accuracy:
+      file: sklearn_metrics
+      function: accuracy_evaluate
       precision:
         file: sklearn_metrics  # 使用 sklearn_metrics.py
         function: precision_evaluate  # 调用 precision_evaluate 函数

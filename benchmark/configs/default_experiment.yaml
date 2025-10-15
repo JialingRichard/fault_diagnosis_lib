@@ -69,6 +69,12 @@ training_templates:
     patience: 10
     optimizer: 'adam'
     print_interval: 10  # 每10轮打印一次训练信息
+    # 训练期评估与监控（与 SupervisedTrainer 严格对齐）
+    epochinfo: 'train_acc'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
   
   supervised_fast:
     type: supervised
@@ -78,6 +84,12 @@ training_templates:
     patience: 5
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印（用于快速调试）
+    # 训练期评估与监控（与 SupervisedTrainer 严格对齐）
+    epochinfo: 'train_acc'
+    monitor:
+      metric: 'accuracy'
+      mode: 'max'
+      split: 'val'
   
   # self_supervised:
   #   type: self_supervised  # 自监督学习训练
@@ -132,6 +144,11 @@ experiments:
 
 # 评估配置模板
 evaluation_templates:
+  # 训练期轻量模板：仅accuracy（用于快速监控与best选择）
+  train_acc:
+    accuracy:
+      file: sklearn_metrics
+      function: accuracy_evaluate
   nothing:
     metrics:
     
