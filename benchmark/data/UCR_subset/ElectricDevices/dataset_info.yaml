@@ -1,0 +1,70 @@
+class_names:
+- class_0
+- class_1
+- class_2
+- class_3
+- class_4
+- class_5
+- class_6
+data_info:
+  num_features: 1
+  test_samples: 7711
+  timesteps: 96
+  train_samples: 8926
+dataset: ElectricDevices
+description: UCR ElectricDevices dataset converted to framework format
+num_classes: 7
+original_labels:
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - i8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    AQAAAAAAAAA=
+  : 0
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AgAAAAAAAAA=
+  : 1
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AwAAAAAAAAA=
+  : 2
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BAAAAAAAAAA=
+  : 3
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BQAAAAAAAAA=
+  : 4
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BgAAAAAAAAA=
+  : 5
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BwAAAAAAAAA=
+  : 6
+preprocessing:
+  description: Raw UCR data, no preprocessing applied
+  normalization: none
+source: UCR Time Series Classification Archive 2018
+task: multi_class_classification

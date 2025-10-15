@@ -1,0 +1,172 @@
+class_names:
+- class_0
+- class_1
+- class_2
+- class_3
+- class_4
+- class_5
+- class_6
+- class_7
+- class_8
+- class_9
+- class_10
+- class_11
+- class_12
+- class_13
+- class_14
+- class_15
+- class_16
+- class_17
+- class_18
+- class_19
+- class_20
+- class_21
+- class_22
+- class_23
+data_info:
+  num_features: 1
+  test_samples: 16800
+  timesteps: 46
+  train_samples: 7200
+dataset: Crop
+description: UCR Crop dataset converted to framework format
+num_classes: 24
+original_labels:
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - i8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    AQAAAAAAAAA=
+  : 0
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AgAAAAAAAAA=
+  : 1
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AwAAAAAAAAA=
+  : 2
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BAAAAAAAAAA=
+  : 3
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BQAAAAAAAAA=
+  : 4
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BgAAAAAAAAA=
+  : 5
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    BwAAAAAAAAA=
+  : 6
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    CAAAAAAAAAA=
+  : 7
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    CQAAAAAAAAA=
+  : 8
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    CgAAAAAAAAA=
+  : 9
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    CwAAAAAAAAA=
+  : 10
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    DAAAAAAAAAA=
+  : 11
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    DQAAAAAAAAA=
+  : 12
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    DgAAAAAAAAA=
+  : 13
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    DwAAAAAAAAA=
+  : 14
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    EAAAAAAAAAA=
+  : 15
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    EQAAAAAAAAA=
+  : 16
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    EgAAAAAAAAA=
+  : 17
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    EwAAAAAAAAA=
+  : 18
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    FAAAAAAAAAA=
+  : 19
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    FQAAAAAAAAA=
+  : 20
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    FgAAAAAAAAA=
+  : 21
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    FwAAAAAAAAA=
+  : 22
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    GAAAAAAAAAA=
+  : 23
+preprocessing:
+  description: Raw UCR data, no preprocessing applied
+  normalization: none
+source: UCR Time Series Classification Archive 2018
+task: multi_class_classification

@@ -1,0 +1,40 @@
+class_names:
+- class_0
+- class_1
+data_info:
+  num_features: 1
+  test_samples: 810
+  timesteps: 500
+  train_samples: 3636
+dataset: FordB
+description: UCR FordB dataset converted to framework format
+num_classes: 2
+original_labels:
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - i8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    //////////8=
+  : 0
+  ? !!python/object/apply:numpy._core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AQAAAAAAAAA=
+  : 1
+preprocessing:
+  description: Raw UCR data, no preprocessing applied
+  normalization: none
+source: UCR Time Series Classification Archive 2018
+task: binary_classification
