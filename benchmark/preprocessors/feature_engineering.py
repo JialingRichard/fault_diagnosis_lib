@@ -1,8 +1,7 @@
 """
-特征工程预处理器
-==============
-
-提供各种特征工程方法
+feature_engineering.py
+======================
+Provides various feature engineering methods.
 """
 
 import numpy as np
@@ -11,38 +10,38 @@ from scipy.stats import skew, kurtosis
 
 def add_statistical_features(X_train, X_test, **kwargs):
     """
-    添加统计特征（均值、标准差、偏度、峰度）
+    Add statistical features (mean, std, skewness, kurtosis) to each sample.
     
     Args:
-        X_train: 训练数据
-        X_test: 测试数据
-        **kwargs: 额外参数
+        X_train: Training data
+        X_test: Testing data
+        **kwargs: Additional parameters
         
     Returns:
         (X_train_processed, X_test_processed)
     """
     def extract_stats(X):
-        # 计算统计特征
+        # Compute statistical features
         mean_feat = np.mean(X, axis=1, keepdims=True)
         std_feat = np.std(X, axis=1, keepdims=True)
-        
-        # 使用 warnings.catch_warnings() 抑制 scipy 的数值精度警告
+
+        # Suppress scipy's numerical precision warnings
         import warnings
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='Precision loss occurred in moment calculation')
-            
-            # 计算偏度和峰度，并处理可能的数值问题
+
+            # Compute skewness and kurtosis, handling potential numerical issues
             skew_vals = skew(X, axis=1, nan_policy='omit')
             kurt_vals = kurtosis(X, axis=1, nan_policy='omit')
-            
-            # 将 NaN 和 Inf 替换为 0
+
+            # Replace NaN and Inf with 0
             skew_vals = np.nan_to_num(skew_vals, nan=0.0, posinf=0.0, neginf=0.0)
             kurt_vals = np.nan_to_num(kurt_vals, nan=0.0, posinf=0.0, neginf=0.0)
             
             skew_feat = skew_vals.reshape(X.shape[0], 1, X.shape[2])
             kurt_feat = kurt_vals.reshape(X.shape[0], 1, X.shape[2])
-        
-        # 将统计特征添加到原始数据中
+
+        # Add statistical features to original data
         X_extended = np.concatenate([X, mean_feat, std_feat, skew_feat, kurt_feat], axis=1)
         return X_extended
     

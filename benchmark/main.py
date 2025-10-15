@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Fault Diagnosis Library - 主程序入口
-基于配置的多模型多数据集故障诊断基准测试框架
+Fault Diagnosis Library - Entry Point
+Configuration-driven benchmarking framework for multi-model, multi-dataset fault diagnosis.
 
-使用方法:
+Usage:
     python main.py [config_file]
     
-默认配置文件: configs/default_experiment.yaml
+Default config: configs/default_experiment.yaml
 """
 import os
 import sys
@@ -15,17 +15,16 @@ import logging
 import time
 
 def _set_global_seed(cfg):
-    """统一设置 Python/NumPy/PyTorch 的随机种子与可选确定性。
+    """Set global random seeds (Python/NumPy/PyTorch) and optional determinism.
 
-    读取配置中的 `global.seed` 与 `global.deterministic`（可选），
-    若未提供 seed，则使用固定默认 42。
+    Reads `global.seed` and `global.deterministic` from config. Uses 42 by default.
     """
     try:
         import random
         import numpy as np
         import torch
     except Exception:
-        # 依赖缺失时尽量不影响主流程
+        # Keep main flow running even if dependencies not present
         return None
 
     gcfg = (cfg or {}).get('global', {}) if isinstance(cfg, dict) else {}
@@ -41,15 +40,15 @@ def _set_global_seed(cfg):
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
-        # 确定性（可选，可能降低性能）
+        # Determinism (optional, may reduce performance)
         torch.backends.cudnn.deterministic = deterministic
-        # 为了确定性，关闭 benchmark；若不要求确定性，可由用户自行配置
+        # Disable benchmark when deterministic for reproducibility
         if deterministic:
             torch.backends.cudnn.benchmark = False
     except Exception:
         pass
 
-    print(f"全局随机种子: {seed} | 确定性: {deterministic}")
+    print(f"Global seed: {seed} | Deterministic: {deterministic}")
     return seed
 
 # 确保从benchmark目录运行并设置路径
@@ -65,7 +64,7 @@ from src.eval_loader import EvalLoader
 from src.result_manager import ResultManager
 
 def setup_logging():
-    """设置日志系统"""
+    """Configure basic logging (unused now, kept for reference)."""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -73,49 +72,41 @@ def setup_logging():
     )
 
 def expand_dataset_collections(config):
-    """
-    展开数据集合集为多个独立实验
-    
-    Args:
-        config: 原始配置
-    
-    Returns:
-        展开后的配置
-    """
+    """Expand dataset collections into individual experiments."""
     from pathlib import Path
     
     expanded_experiments = []
     
     for experiment in config.get('experiments', []):
         if 'dataset_collection' in experiment:
-            # 处理数据集合集
+            # Handle dataset collection
             collection_name = experiment['dataset_collection']
             
             if collection_name not in config['datasets']:
-                print(f" 数据集合集 '{collection_name}' 不存在")
+                print(f" Dataset collection '{collection_name}' not found")
                 continue
             
             collection_config = config['datasets'][collection_name]
             collection_path = Path(collection_config['collection_path'])
             
             if not collection_path.exists():
-                print(f"数据集合集路径不存在: {collection_path}")
+                print(f"Dataset collection path does not exist: {collection_path}")
                 continue
             
-            # 发现子数据集
+            # Discover sub-datasets
             subdatasets = []
             for sub_dir in collection_path.iterdir():
                 if sub_dir.is_dir():
-                    # 检查是否包含必需的.npy文件
+                    # Require mandatory .npy files
                     required_files = ['train_X.npy', 'train_y.npy', 'test_X.npy', 'test_y.npy']
                     if all((sub_dir / f).exists() for f in required_files):
                         subdatasets.append(sub_dir.name)
             
             if not subdatasets:
-                print(f" 数据集合集 '{collection_name}' 中未找到有效的子数据集")
+                print(f" Dataset collection '{collection_name}' has no valid sub-datasets")
                 continue
             
-            print(f"发现数据集合集 '{collection_name}': {len(subdatasets)} 个子数据集")
+            print(f"Found dataset collection '{collection_name}': {len(subdatasets)} sub-datasets")
             print(f"   {', '.join(subdatasets)}")
             
             # 为每个子数据集创建数据集配置
@@ -537,7 +528,7 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             trainer.experiment_name = experiment['name']
             training_results = trainer.train()
             
-            # 3.4 评估
+            # 3.4 评估（默认：测试集）
             print(f"开始评估...")
             # 如有记录，打印本次评估所用的最佳checkpoint
             sel_ckpt = training_results.get('selected_checkpoint')
@@ -564,6 +555,25 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                 actual_X_train, actual_y_train, training_results['train_predictions'],
                 actual_X_test, actual_y_test, training_results['test_predictions']
             )
+
+            # 实验级结果精简的准备：若该实验配置了 summary 且需要 val split，则计算一次验证集评估（沿用实验的 evaluation 模板）
+            exp_summary_cfg = experiment.get('summary', {}) if isinstance(experiment.get('summary', {}), dict) else {}
+            summary_eval_results = None
+            if exp_summary_cfg.get('keep_only_best', False) and str(exp_summary_cfg.get('split', 'test')).lower() == 'val':
+                try:
+                    y_val = trainer.y_val
+                    y_val_np = y_val.cpu().numpy() if hasattr(y_val, 'cpu') else y_val
+                    val_pred = getattr(trainer, '_cached_val_pred', None)
+                    if val_pred is None:
+                        val_pred = trainer.predict(trainer.X_val)
+                    eval_loader.set_context(plots_dir=plots_dir, epoch_info=None)
+                    summary_eval_results = eval_loader.evaluate(
+                        config, experiment['evaluation'],
+                        actual_X_train, actual_y_train, training_results['train_predictions'],
+                        trainer.X_val, y_val_np, val_pred
+                    )
+                except Exception as e:
+                    logging.getLogger(__name__).warning(f"summary 精简: 计算验证集评估失败，将回退到测试集: {e}")
             
             print(f"训练完成: {training_results['total_epochs']}轮 | 验证损失: {training_results['final_val_loss']:.4f}")
             print(f"评估结果: ", end="")
@@ -582,6 +592,8 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                 'epochs': training_results['total_epochs'],
                 'val_loss': training_results['final_val_loss'],
                 'eval_results': eval_results,
+                'summary_cfg': exp_summary_cfg,
+                'summary_eval_results': summary_eval_results,
                 # 添加数据集详细信息
                 'train_samples': X_train.shape[0],
                 'test_samples': X_test.shape[0],
@@ -639,6 +651,46 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             
         print()
     
+    # 可选：按(模型+数据集)精简为最优结果（grid_only_best）
+    # 实验级精简：按(模型+数据集)分组，若组内任一实验声明 keep_only_best，则使用该组第一个声明的 summary 配置作为准则精简该组
+    if results_summary:
+        from collections import defaultdict
+        group_map = defaultdict(list)
+        for res in results_summary:
+            group_map[(res.get('model'), res.get('dataset'))].append(res)
+        new_results = []
+        for key, items in group_map.items():
+            # 查找组内声明的 summary 配置
+            cfg_items = [it for it in items if isinstance(it.get('summary_cfg'), dict) and it['summary_cfg'].get('keep_only_best', False)]
+            if not cfg_items:
+                new_results.extend(items)
+                continue
+            base_cfg = cfg_items[0]['summary_cfg']
+            metric = str(base_cfg.get('metric', '')).strip()
+            mode = str(base_cfg.get('mode', 'max')).lower()
+            split = str(base_cfg.get('split', 'test')).lower()
+            if not metric:
+                raise RuntimeError(f"summary 精简: 未提供 metric（组 {key}）")
+            def _numeric(v):
+                return isinstance(v, (int, float))
+            def score(it):
+                src = (it.get('eval_results') or {}) if split == 'test' else (it.get('summary_eval_results') or {})
+                if not _numeric(src.get(metric)):
+                    raise RuntimeError(f"summary 精简: 实验 {it.get('name')} 缺少指定指标或非数值 metric={metric}, split={split}")
+                return float(src.get(metric))
+            def better(a, b):
+                return a < b if mode == 'min' else a > b
+            best = None
+            best_s = None
+            for it in items:
+                s = score(it)
+                if best is None or better(s, best_s):
+                    best, best_s = it, s
+            new_results.append(best)
+        if len(new_results) != len(results_summary):
+            print(f"已按实验级 summary 精简：每个(模型+数据集)仅保留最优，共{len(new_results)}项（原{len(results_summary)}）")
+        results_summary = new_results
+
     # 4. 生成总结报告
     print("步骤 4: 生成实验总结报告")
     print("=" * 80)

@@ -1,11 +1,10 @@
 """
-CNN模型实现
+CNN models
 ==========
 
-用于时序异常检测的1D卷积神经网络
-包含两个版本：
-- CNN2seq: 序列到序列输出，适用于序列预测任务
-- CNN2one: 序列到单值输出，适用于分类任务
+1D CNNs for time series tasks:
+- CNN2seq: sequence-to-sequence output
+- CNN2one: sequence-to-one classification
 """
 
 import torch
@@ -16,10 +15,8 @@ from typing import Optional
 
 class CNN2seq(nn.Module):
     """
-    1D CNN序列到序列模型
-    
-    适用于时间序列数据的卷积神经网络
-    输出格式：(batch_size, sequence_length, output_dim)
+    1D CNN sequence-to-sequence model.
+    Output: (batch_size, sequence_length, output_dim)
     """
     
     def __init__(self, 
@@ -30,15 +27,15 @@ class CNN2seq(nn.Module):
                  dropout: float = 0.2,
                  output_dim: Optional[int] = None):
         """
-        初始化CNN模型
+        Initialize CNN model.
         
         Args:
-            input_dim: 输入特征维度
-            num_filters: 卷积核数量
-            filter_sizes: 卷积核大小列表
-            num_layers: 卷积层数
-            dropout: dropout概率
-            output_dim: 输出维度，如果为None则与input_dim相同
+            input_dim: input feature dimension
+            num_filters: number of filters
+            filter_sizes: list of kernel sizes
+            num_layers: number of conv layers
+            dropout: dropout prob
+            output_dim: output dimension (defaults to input_dim)
         """
         super(CNN2seq, self).__init__()
         
@@ -96,13 +93,12 @@ class CNN2seq(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        前向传播
+        Forward pass.
         
         Args:
-            x: 输入张量，形状为 (batch_size, sequence_length, input_dim)
-            
+            x: (batch_size, sequence_length, input_dim)
         Returns:
-            输出张量，形状为 (batch_size, sequence_length, output_dim)
+            (batch_size, sequence_length, output_dim)
         """
         # CNN期望输入格式为 (batch, channels, length)
         # 需要转换 (batch, seq_len, features) -> (batch, features, seq_len)
@@ -132,10 +128,8 @@ class CNN2seq(nn.Module):
 
 class CNN2one(nn.Module):
     """
-    1D CNN序列到单值分类模型
-    
-    适用于时间序列分类任务的卷积神经网络
-    输出格式：(batch_size, output_dim)
+    1D CNN sequence-to-one classification model.
+    Output: (batch_size, output_dim)
     """
     
     def __init__(self, 
@@ -148,16 +142,16 @@ class CNN2one(nn.Module):
                  pooling_method: str = 'last',
                  **kwargs):
         """
-        初始化CNN分类模型
+        Initialize CNN classifier.
         
         Args:
-            input_dim: 输入特征维度
-            num_filters: 卷积核数量
-            filter_sizes: 卷积核大小列表
-            num_layers: 卷积层数
-            dropout: dropout概率
-            output_dim: 输出维度（分类类别数）
-            pooling_method: 池化方法 ('last', 'mean', 'max', 'attention')
+            input_dim: input feature dimension
+            num_filters: number of filters
+            filter_sizes: list of kernel sizes
+            num_layers: number of conv layers
+            dropout: dropout prob
+            output_dim: number of classes
+            pooling_method: 'last'|'mean'|'max'|'attention'
         """
         super(CNN2one, self).__init__()
         
@@ -222,13 +216,12 @@ class CNN2one(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        前向传播
+        Forward pass.
         
         Args:
-            x: 输入张量，形状为 (batch_size, sequence_length, input_dim)
-            
+            x: (batch_size, sequence_length, input_dim)
         Returns:
-            输出张量，形状为 (batch_size, output_dim)
+            (batch_size, output_dim)
         """
         # CNN期望输入格式为 (batch, channels, length)
         # 需要转换 (batch, seq_len, features) -> (batch, features, seq_len)
@@ -275,9 +268,4 @@ class CNN2one(nn.Module):
         return output
 
 
-# 向后兼容：CNN = CNN2seq
-CNN = CNN2seq
-
-
-
-    
+# 注意：请在配置中显式指定类名（如 CNN2one 或 CNN2seq），不再提供默认别名。

@@ -1,8 +1,8 @@
 """
-评估加载器 (EvalLoader)
-====================
+Evaluation Loader (EvalLoader)
+==============================
 
-负责动态加载和执行评估函数
+Responsible for dynamically loading and executing evaluator functions.
 
 """
 
@@ -16,38 +16,35 @@ logger = logging.getLogger(__name__)
 
 
 class EvalLoadError(Exception):
-    """评估加载异常"""
+    """Evaluation loading error"""
     pass
 
 
 class EvalLoader:
     """
-    评估加载器
-    
-    动态加载评估函数并执行评估
+    Evaluation loader that dynamically loads and runs evaluators.
     """
     
     def __init__(self, evaluators_dir: Path = None):
-        """初始化评估加载器"""
+        """Initialize the evaluation loader"""
         if evaluators_dir is None:
             evaluators_dir = Path(__file__).parent.parent / "evaluators"
         
         self.evaluators_dir = Path(evaluators_dir)
         self.evaluator_registry = {}
         
-        # 评估上下文信息
+        # Evaluation context
         self.plots_dir = None
-        self.epoch_info = None  # {'epoch': 10} 表示在训练的第10轮，None表示最终评估
+        self.epoch_info = None  # {'epoch': 10} means during training; None means final evaluation
         
-        logger.debug(f"评估加载器初始化完成，评估器目录: {self.evaluators_dir}")
+        logger.debug(f"EvalLoader initialized, evaluators dir: {self.evaluators_dir}")
     
     def set_context(self, plots_dir=None, epoch_info=None):
-        """
-        设置评估上下文信息
+        """Set evaluation context.
         
         Args:
-            plots_dir: 图片保存目录
-            epoch_info: epoch信息字典，如 {'epoch': 10}，None表示最终评估
+            plots_dir: Directory to save figures
+            epoch_info: Epoch info dict like {'epoch': 10}; None for final evaluation
         """
         self.plots_dir = Path(plots_dir) if plots_dir else None
         self.epoch_info = epoch_info
@@ -55,37 +52,36 @@ class EvalLoader:
     def evaluate(self, config: Dict[str, Any], eval_template_name: str,
                 X_train: np.ndarray, y_train: np.ndarray, y_train_pred: np.ndarray,
                 X_test: np.ndarray, y_test: np.ndarray, y_test_pred: np.ndarray) -> Dict[str, float]:
-        """
-        执行评估
+        """Run evaluation for a template.
         
         Args:
-            config: 完整配置字典
-            eval_template_name: 评估模板名称
-            X_train, y_train, y_train_pred: 训练集数据和预测
-            X_test, y_test, y_test_pred: 测试集数据和预测
-            
+            config: Full configuration
+            eval_template_name: Evaluation template name
+            X_train, y_train, y_train_pred: Training data/labels/predictions
+            X_test, y_test, y_test_pred: Test(or selected split) data/labels/predictions
+        
         Returns:
-            评估结果字典 {'metric_name': score}
+            Dict of results {'metric_name': score}
         """
-        # 获取评估配置
+        # get evaluation config
         if 'evaluation_templates' not in config:
-            raise EvalLoadError("配置中缺少 'evaluation_templates'")
+            raise EvalLoadError("Missing 'evaluation_templates' in config")
         
         if eval_template_name not in config['evaluation_templates']:
             available = list(config['evaluation_templates'].keys())
-            raise EvalLoadError(f"评估模板 '{eval_template_name}' 不存在，可用: {available}")
+            raise EvalLoadError(f"Evaluation template '{eval_template_name}' not found. Available: {available}")
         
         eval_config = config['evaluation_templates'][eval_template_name]
-        # 支持扁平化模板：若无 metrics 键，则将非保留键视为指标配置
+        # Flattened template support: if no 'metrics', treat non '_' keys as metrics config
         if isinstance(eval_config, dict) and 'metrics' not in eval_config:
             metrics = {k: v for k, v in eval_config.items() if not str(k).startswith('_')}
         else:
             metrics = eval_config.get('metrics', {})
         
         if not metrics:
-            raise EvalLoadError(f"评估模板 '{eval_template_name}' 中没有定义指标")
-        
-        # 执行所有评估指标
+            raise EvalLoadError(f"No metrics defined in evaluation template '{eval_template_name}'")
+
+        # Execute all evaluation metrics
         results = {}
         for metric_name, metric_config in metrics.items():
             evaluator_func = self._load_evaluator(metric_name, metric_config)
@@ -93,140 +89,120 @@ class EvalLoader:
                 result = evaluator_func(X_train, y_train, y_train_pred, 
                                       X_test, y_test, y_test_pred)
                 
-                # 处理不同类型的返回值
+                # Post-process different return types
                 processed_result = self._process_evaluator_result(
                     result, metric_name, metric_config
                 )
                 results[metric_name] = processed_result
                 
-                # 根据结果类型决定日志输出
+                # Log by result type
                 if isinstance(processed_result, (int, float)):
-                    logger.info(f"评估指标 '{metric_name}': {processed_result:.4f}")
+                    logger.info(f"Metric '{metric_name}': {processed_result:.4f}")
                 elif isinstance(processed_result, str):
-                    logger.info(f"评估指标 '{metric_name}': {processed_result}")
+                    logger.info(f"Metric '{metric_name}': {processed_result}")
                 else:
-                    logger.info(f"评估指标 '{metric_name}': 已处理")
-                    
+                    logger.info(f"Metric '{metric_name}': processed")
+                
             except Exception as e:
-                logger.error(f"评估指标 '{metric_name}' 执行失败: {e}")
+                logger.error(f"Metric '{metric_name}' failed: {e}")
                 results[metric_name] = None
         
         return results
     
     def _process_evaluator_result(self, result, metric_name: str, metric_config: Dict[str, Any]):
-        """
-        处理评估器返回值
-        
-        Args:
-            result: 评估器返回值（可以是数值、字符串或Figure对象）
-            metric_name: 指标名称
-            metric_config: 指标配置
-            
-        Returns:
-            处理后的结果（数值或字符串）
-        """
+        """Process evaluator return value into a numeric/string form."""
         import matplotlib.figure
         
-        # 数值型：直接返回
+        # Numeric
         if isinstance(result, (int, float, np.number)):
             return float(result)
         
-        # 字符串型：直接返回
+        # String
         if isinstance(result, str):
             return result
         
-        # 图像型：保存图像并返回样本数或其他数值
+        # Figure: save and return numeric (e.g., count)
         if isinstance(result, matplotlib.figure.Figure):
             return self._save_figure(result, metric_name, metric_config)
         
-        # 元组型：(figure, metric_value)
+        # Tuple: (figure, metric_value)
         if isinstance(result, tuple) and len(result) == 2:
             fig, value = result
             if isinstance(fig, matplotlib.figure.Figure):
                 self._save_figure(fig, metric_name, metric_config)
                 return float(value) if isinstance(value, (int, float, np.number)) else value
         
-        # 其他类型：尝试转换为float
+        # Others: try casting to float
         try:
             return float(result)
         except:
-            logger.warning(f"无法处理评估器 '{metric_name}' 的返回值类型: {type(result)}")
+            logger.warning(f"Cannot process return type from evaluator '{metric_name}': {type(result)}")
             return None
     
     def _save_figure(self, fig, metric_name: str, metric_config: Dict[str, Any]) -> float:
-        """
-        保存matplotlib图像
-        
-        Args:
-            fig: matplotlib Figure对象
-            metric_name: 指标名称
-            metric_config: 指标配置
-            
-        Returns:
-            保存成功返回1.0，失败返回0.0
-        """
+        """Save a matplotlib figure to the proper folder and return 1.0 on success."""
         if self.plots_dir is None:
-            logger.warning(f"未设置plots_dir，无法保存图像: {metric_name}")
+            logger.warning(f"plots_dir not set; cannot save figure for metric: {metric_name}")
             import matplotlib.pyplot as plt
             plt.close(fig)
             return 0.0
         
         try:
             import os
-            
-            # 确定保存路径
+
+            # Determine save path
             if self.epoch_info is not None:
-                # 训练过程中：保存到epochinfo子目录
+                # During training: save to 'epochinfo' subdir
                 epoch_num = self.epoch_info.get('epoch', 0)
                 epochinfo_dir = self.plots_dir / 'epochinfo'
                 epochinfo_dir.mkdir(parents=True, exist_ok=True)
                 
-                # 文件名：metric_name_epoch_XXX.png
+                # filename: metric_name_epoch_XXX.png
                 filename = f"{metric_name}_epoch_{epoch_num+1:03d}.png"
                 save_path = epochinfo_dir / filename
             else:
-                # 最终评估：保存到主plots目录
+                # Final evaluation: save to main plots dir
                 filename = f"{metric_name}.png"
                 save_path = self.plots_dir / filename
-            
-            # 保存图像
+
+            # Save figure
             fig.savefig(save_path, dpi=300, bbox_inches='tight')
             
-            # 记录保存信息（统一交给日志级别控制输出位置）
-            logger.info(f"图像已保存: {save_path}")
-            
-            # 关闭图形释放内存
+            # Log save info
+            logger.info(f"Figure saved: {save_path}")
+
+            # Close figure to release memory
             import matplotlib.pyplot as plt
             plt.close(fig)
-            
-            return 1.0  # 返回1.0表示保存成功
-            
+
+            return 1.0  # Return 1.0 to indicate success
+
         except Exception as e:
-            logger.error(f"保存图像失败 '{metric_name}': {e}")
+            logger.error(f"Failed to save figure for '{metric_name}': {e}")
             import matplotlib.pyplot as plt
             plt.close(fig)
             return 0.0
     
     def _load_evaluator(self, metric_name: str, metric_config: Dict[str, Any]) -> Callable:
-        """动态加载评估函数"""
+        """Dynamically load evaluator function by name."""
         evaluator_key = metric_name.lower()
         
         if evaluator_key not in self.evaluator_registry:
             try:
-                # 确定模块名：配置中的file字段 或 默认使用metric_name
+                # Resolve module name: config 'file' or fall back to metric_name
                 module_name = metric_config.get('file', metric_name) if metric_config else metric_name
                 
-                # 确定函数名：配置中的function字段 或 默认使用'evaluate'
+                # Resolve function: config 'function' or default 'evaluate'
                 function_name = metric_config.get('function', 'evaluate') if metric_config else 'evaluate'
                 
-                # 动态导入评估器模块
+                # Dynamic import
                 module = importlib.import_module(f"evaluators.{module_name}")
                 evaluator_func = getattr(module, function_name)
                 self.evaluator_registry[evaluator_key] = evaluator_func
-                logger.info(f"评估器 '{metric_name}' 加载成功 (模块: {module_name}, 函数: {function_name})")
+                logger.info(f"Evaluator '{metric_name}' loaded (module: {module_name}, function: {function_name})")
             except ImportError:
-                raise EvalLoadError(f"无法导入评估器模块: evaluators.{module_name}")
+                raise EvalLoadError(f"Cannot import evaluator module: evaluators.{module_name}")
             except AttributeError:
-                raise EvalLoadError(f"评估器模块 evaluators.{module_name} 中没有 '{function_name}' 函数")
+                raise EvalLoadError(f"Evaluator module evaluators.{module_name} has no function '{function_name}'")
         
         return self.evaluator_registry[evaluator_key]

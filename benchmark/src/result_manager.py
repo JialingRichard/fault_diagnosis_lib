@@ -1,10 +1,8 @@
 """
-结果管理器 (ResultManager)
-==========================
+Result Manager (ResultManager)
+==============================
 
-负责目录管理、版本号生成、实时日志和checkpoint保存
-
-Linus准则：简洁高效，如无必要勿增实体
+Manages run directories, versioning, live logs, and checkpoints.
 """
 
 import os
@@ -18,15 +16,14 @@ import torch
 
 
 class ResultManager:
-    """结果管理器 - 处理所有输出保存"""
+    """Result manager for all outputs"""
     
     def __init__(self, config_file: str, results_base_dir: str = None):
-        """
-        初始化结果管理器
+        """Initialize result manager.
         
         Args:
-            config_file: 配置文件路径
-            results_base_dir: 结果基础目录
+            config_file: config file path
+            results_base_dir: base results directory
         """
         if results_base_dir is None:
             results_base_dir = Path(__file__).parent.parent / "results"
@@ -34,35 +31,35 @@ class ResultManager:
         self.results_base_dir = Path(results_base_dir)
         self.config_name = Path(config_file).stem  # 去掉.yaml后缀
         
-        # 创建版本目录
+        # Create versioned run directory
         self.run_dir = self._create_run_directory()
         
-        # 设置日志文件
+        # Log files
         self.log_file = self.run_dir / "run.log"
         self.error_log_file = self.run_dir / "error.log"
         self._setup_logging()
         
-        # 保存配置快照
+        # Save config snapshot
         self._save_config_snapshot(config_file)
         
-        print(f"结果将保存到: {self.run_dir}")
+        print(f"Results will be saved to: {self.run_dir}")
     
     def _create_run_directory(self) -> Path:
-        """创建运行目录，自动生成版本号"""
+        """Create run directory with auto-incremented version"""
         config_dir = self.results_base_dir / self.config_name
         config_dir.mkdir(parents=True, exist_ok=True)
         
-        # 查找已有版本号
+        # Discover existing versions
         existing_versions = []
         for dir_path in config_dir.iterdir():
             if dir_path.is_dir() and dir_path.name.startswith('v'):
                 try:
-                    version_num = int(dir_path.name.split('_')[0][1:])  # 提取v后面的数字
+                    version_num = int(dir_path.name.split('_')[0][1:])  # get number after 'v'
                     existing_versions.append(version_num)
                 except (ValueError, IndexError):
                     continue
         
-        # 生成新版本号
+        # Generate next version
         next_version = max(existing_versions, default=-1) + 1
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_dir_name = f"v{next_version}_{timestamp}"
@@ -73,11 +70,11 @@ class ResultManager:
         return run_dir
     
     def _setup_logging(self):
-        """设置实时日志记录与多文件分级输出"""
-        # 1) 捕获 warnings 到 logging
+        """Setup live logging with multiple handlers"""
+        # 1) Capture warnings to logging
         logging.captureWarnings(True)
 
-        # 2) 重定向 print 到主运行日志（run.log）
+        # 2) Redirect print to run.log
         class TeeStream:
             def __init__(self, log_file):
                 self.terminal = sys.stdout
@@ -86,7 +83,7 @@ class ResultManager:
             def write(self, message):
                 self.terminal.write(message)
                 self.log_file.write(message)
-                self.log_file.flush()  # 实时写入
+                self.log_file.flush()  # flush log file immediately
 
             def flush(self):
                 self.terminal.flush()
@@ -94,14 +91,14 @@ class ResultManager:
 
         sys.stdout = TeeStream(self.log_file)
 
-        # 3) 统一配置 root logger（DEBUG 级别，具体输出由各 Handler 控制）
+        # 3) Configure root logger (DEBUG), handlers control output levels
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.DEBUG)
 
-        # 避免重复添加 handler（在重复初始化时）
+        # Avoid adding handler multiple times (during re-initialization)
         existing = {type(h).__name__ + getattr(h, 'baseFilename', '') for h in root_logger.handlers}
 
-        # 控制台输出（INFO+），显示到当前 stdout（已被 Tee 包装，从而同时写 run.log）
+        # Console output (INFO+) to current stdout (tee'd to run.log)
         has_stdout_handler = any(
             isinstance(h, logging.StreamHandler) and getattr(h, 'stream', None) is sys.stdout
             for h in root_logger.handlers
@@ -115,7 +112,7 @@ class ResultManager:
             ))
             root_logger.addHandler(console_handler)
 
-        # Debug 明细日志：写入 debug.log（DEBUG+ 全量，不影响控制台）
+        # Debug details: write to debug.log (DEBUG+)
         debug_log_path = self.run_dir / 'debug.log'
         debug_handler = logging.FileHandler(debug_log_path, mode='a', encoding='utf-8')
         debug_handler.setLevel(logging.DEBUG)
@@ -123,7 +120,7 @@ class ResultManager:
             fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         ))
-        # 过滤掉 matplotlib.font_manager 的 findfont 噪音
+        # filter matplotlib.font_manager findfont noise
         class _MatplotlibFindfontFilter(logging.Filter):
             def filter(self, record: logging.LogRecord) -> bool:
                 try:
@@ -137,7 +134,7 @@ class ResultManager:
         if key_debug not in existing:
             root_logger.addHandler(debug_handler)
 
-        # 错误日志：写入 error.log（ERROR+）
+        # Errors: write to error.log (ERROR+)
         error_log_path = self.run_dir / 'error.log'
         error_handler = logging.FileHandler(error_log_path, mode='a', encoding='utf-8')
         error_handler.setLevel(logging.ERROR)
@@ -149,23 +146,23 @@ class ResultManager:
         if key_error not in existing:
             root_logger.addHandler(error_handler)
 
-        # 降低 matplotlib.font_manager 的日志噪音
+        # Reduce matplotlib.font_manager noise
         try:
             logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
         except Exception:
             pass
     
     def _save_config_snapshot(self, config_file: str):
-        """保存配置文件快照"""
+        """Save a copy of the config file"""
         config_snapshot = self.run_dir / "config.yaml"
         shutil.copy2(config_file, config_snapshot)
     
     def create_experiment_dir(self, experiment_name: str) -> Path:
-        """为单个实验创建目录"""
+        """Create per-experiment directories"""
         exp_dir = self.run_dir / experiment_name
         exp_dir.mkdir(exist_ok=True)
-        
-        # 创建子目录
+
+        # create subdirectories
         (exp_dir / "checkpoints").mkdir(exist_ok=True)
         (exp_dir / "plots").mkdir(exist_ok=True)
         
@@ -174,15 +171,15 @@ class ResultManager:
     def save_checkpoint(self, experiment_name: str, model: torch.nn.Module, 
                        optimizer: torch.optim.Optimizer, epoch: int, 
                        val_loss: float, metrics: Dict[str, float] = None):
-        """保存checkpoint"""
+        """Save checkpoint"""
         exp_dir = self.create_experiment_dir(experiment_name)
         checkpoint_dir = exp_dir / "checkpoints"
         
-        # 文件名包含epoch和loss信息
+        # Filename contains epoch and loss info
         checkpoint_name = f"epoch_{epoch}_loss_{val_loss:.4f}.pth"
         checkpoint_path = checkpoint_dir / checkpoint_name
         
-        # 保存checkpoint
+        # Save checkpoint
         checkpoint = {
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
@@ -192,29 +189,29 @@ class ResultManager:
         }
         
         torch.save(checkpoint, checkpoint_path)
-        
-        # 不在控制台插入额外行；详细信息写入 debug.log（由全局日志控制）
-        logging.getLogger(__name__).debug(f"Checkpoint保存: {checkpoint_path}")
+
+        # Do not insert extra lines in console; detailed info written to debug.log (controlled by global logging)
+        logging.getLogger(__name__).debug(f"Checkpoint saved: {checkpoint_path}")
 
         return checkpoint_path
     
     def get_experiment_plot_dir(self, experiment_name: str) -> Path:
-        """获取实验的plots目录"""
+        """Get plots dir for experiment"""
         exp_dir = self.create_experiment_dir(experiment_name)
         return exp_dir / "plots"
     
     def log_experiment_error(self, experiment_info: str, error_message: str):
-        """记录实验错误到error.log文件"""
+        """Record experiment error into error.log"""
         try:
             with open(self.error_log_file, 'a', encoding='utf-8') as f:
                 f.write(experiment_info)
-                f.write(f"实验失败: {error_message}\n\n")
-                f.flush()  # 实时写入
+                f.write(f"Experiment failed: {error_message}\n\n")
+                f.flush()  # flush log file immediately
         except Exception as e:
-            print(f"写入错误日志失败: {e}")
+            print(f"Failed to write error.log: {e}")
 
     def log_experiment_timing(self, name: str, start_ts: float, end_ts: float, extra: Dict[str, Any] | None = None):
-        """记录实验起止时间与耗时到 CSV（timings.csv）"""
+        """Record experiment timing into CSV (timings.csv)"""
         import time, csv
         timings_csv = self.run_dir / 'timings.csv'
         exists = timings_csv.exists()
@@ -226,7 +223,7 @@ class ResultManager:
             'duration_sec': f"{duration:.3f}"
         }
         if extra:
-            # 扁平附加信息（如显存、样本量）
+            # Flatten extra fields (e.g., memory, samples)
             for k, v in extra.items():
                 row[str(k)] = v
         try:
@@ -236,10 +233,10 @@ class ResultManager:
                     writer.writeheader()
                 writer.writerow(row)
         except Exception as e:
-            logging.getLogger(__name__).warning(f"写入timings.csv失败: {e}")
+            logging.getLogger(__name__).warning(f"Failed to write timings.csv: {e}")
     
     def cleanup(self):
         """清理资源"""
         if hasattr(sys.stdout, 'log_file'):
             sys.stdout.log_file.close()
-            sys.stdout = sys.stdout.terminal  # 恢复原始stdout
+            sys.stdout = sys.stdout.terminal  # restore original stdout

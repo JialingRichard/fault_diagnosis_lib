@@ -5,8 +5,6 @@ Data Loaders for Time Series Anomaly Detection Benchmark
 This module provides a unified and configuration-driven data loading
 and preprocessing pipeline.
 
-Author: Fault Diagnosis Benchmark Team
-Date: 2025-09-17
 """
 
 import logging
@@ -45,38 +43,38 @@ class DataMetadata:
 
 class DataLoader:
     """
-    统一数据加载器，负责协调数据加载和预处理。
+    Unified data loader responsible for coordinating data loading and preprocessing.
     """
     def __init__(self):
-        """初始化数据加载器。"""
-        self.preprocessor_registry = {}  # 缓存已加载的预处理函数
+        """Initialize data loader."""
+        self.preprocessor_registry = {}  # Cache for loaded preprocessing functions
 
     def prepare_data(self, config: Dict[str, Any], dataset_name: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, DataMetadata]:
         """
-        准备数据的主入口。
-        
+        Main entry point for data preparation.
+
         Args:
-            config: 完整配置字典
-            dataset_name: 数据集名称
-            
+            config: Full configuration dictionary
+            dataset_name: Dataset name
+
         Returns:
             (X_train, X_test, y_train, y_test, metadata)
         """
-        logger.info("开始数据加载和预处理...")
+        logger.info("Starting data loading and preprocessing...")
 
         dataset_config = config['datasets'][dataset_name]
         preprocessing_config = dataset_config.get('preprocessing', {})
 
         X_train, y_train, X_test, y_test, metadata = self._load_data(dataset_name, dataset_config)
-        logger.info("加载器已提供预分割数据。")
+        logger.info("Data loader has provided pre-split data.")
 
-        # 使用模块化预处理器
+        # Use modular preprocessor
         try:
             X_train, X_test = self._apply_preprocessing(X_train, X_test, preprocessing_config)
-            logger.info("模块化预处理完成。")
+            logger.info("Modular preprocessing completed.")
         except Exception as e:
-            logger.warning(f"模块化预处理失败，回退到传统预处理: {e}")
-            # 回退到传统预处理方法
+            logger.warning(f"Failed to apply modular preprocessing, falling back to traditional preprocessing: {e}")
+            # Fall back to traditional preprocessing method
             scaler = self._get_scaler(preprocessing_config)
             if scaler:
                 original_shape_train = X_train.shape
@@ -92,86 +90,86 @@ class DataLoader:
                     scaler_type = "Standard"
                 else:
                     scaler_type = "Unknown"
-                
-                logger.info(f"已对数据应用 '{scaler_type}' 标准化。")
+
+                logger.info(f"Applied '{scaler_type}' normalization.")
             else:
                 print("No normalization applied.")
-        
-        logger.info("数据准备完成。")
+
+        logger.info("Data preparation completed.")
         return X_train, X_test, y_train, y_test, metadata
 
     def _apply_preprocessing(self, X_train: np.ndarray, X_test: np.ndarray, 
                            preprocessing_config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
         """
-        应用模块化预处理步骤
+        Apply modular preprocessing steps
         
         Args:
-            X_train, X_test: 训练和测试数据
-            preprocessing_config: 预处理配置
-            
+            X_train, X_test
+            preprocessing_config: Preprocessing configuration
+
         Returns:
             (X_train_processed, X_test_processed)
         """
         if not preprocessing_config:
-            logger.info("未配置预处理步骤，返回原始数据")
+            logger.info("No preprocessing steps configured, returning original data")
             return X_train, X_test
-        
-        # 记录原始数据形状
-        logger.info(f"开始预处理 | 原始数据: train{X_train.shape}, test{X_test.shape}")
-        
+
+        # Record original data shapes
+        logger.info(f"Starting preprocessing | Original data: train{X_train.shape}, test{X_test.shape}")
+
         X_train_processed = X_train.copy()
         X_test_processed = X_test.copy()
-        
-        # 按顺序应用每个预处理步骤
+
+        # Apply each preprocessing step in order
         for step_name, step_config in preprocessing_config.items():
             if step_name == 'steps':
-                # 新的步骤列表格式
+                # New step list format
                 for step in step_config:
                     step_name = step['name']
                     step_params = step.get('params', {})
                     file_name = step.get('file', None)
                     function_name = step.get('function', step_name)
-                    
-                    # 记录处理前的特征数
+
+                    # Record number of features before processing
                     features_before = X_train_processed.shape[-1]
                     
                     preprocessor_func = self._load_preprocessor(function_name, file_name)
                     if preprocessor_func:
                         X_train_processed, X_test_processed = preprocessor_func(
                             X_train_processed, X_test_processed, **step_params)
-                        
-                        # 记录处理后的特征数
+
+                        # Record number of features after processing
                         features_after = X_train_processed.shape[-1]
-                        
-                        # 构建详细的日志信息
+
+                        # Construct detailed log information
                         param_str = ", ".join([f"{k}={v}" for k, v in step_params.items()]) if step_params else "无参数"
                         feature_change = f"{features_before}→{features_after}" if features_before != features_after else f"{features_before}"
                         
                         logger.info(f"✓ {step_name}: {file_name}.{function_name}({param_str}) | 特征数: {feature_change}")
             else:
-                # 简化格式支持
+                # Simplified format support
                 if self._is_simple_config(step_name, step_config):
-                    # 记录处理前的特征数
+                    # Record number of features before processing
                     features_before = X_train_processed.shape[-1]
                     
                     preprocessor_func = self._load_preprocessor_simple(step_name, step_config)
                     if preprocessor_func:
                         X_train_processed, X_test_processed = preprocessor_func(
                             X_train_processed, X_test_processed)
-                        
-                        # 记录处理后的特征数
+
+                        # Record number of features after processing
                         features_after = X_train_processed.shape[-1]
                         feature_change = f"{features_before}→{features_after}" if features_before != features_after else f"{features_before}"
-                        
-                        logger.info(f"✓ {step_name}: {step_config} | 特征数: {feature_change}")
-        
-        # 记录最终数据形状
-        logger.info(f"预处理完成 | 最终数据: train{X_train_processed.shape}, test{X_test_processed.shape}")
-        
+
+                        logger.info(f"✓ {step_name}: {step_config} | Feature count: {feature_change}")
+
+        # Record final data shapes
+        logger.info(f"Preprocessing completed | Final data: train{X_train_processed.shape}, test{X_test_processed.shape}")
+
         return X_train_processed, X_test_processed
     
     def _is_simple_config(self, step_name: str, step_config: Any) -> bool:
-        """判断是否为简化配置格式"""
+        """Check if the configuration is in simplified format"""
         simple_configs = {
             'normalize': [True, False, 'minmax', 'standard', 'robust'],
             'add_noise': [True, False],
@@ -181,7 +179,7 @@ class DataLoader:
         return step_name in simple_configs and step_config in simple_configs[step_name]
     
     def _load_preprocessor_simple(self, step_name: str, step_config: Any):
-        """加载简化配置的预处理器"""
+        """Load preprocessor for simplified configuration"""
         if step_name == 'normalize':
             if step_config is True or step_config == 'standard':
                 return self._load_preprocessor('standard_normalize', 'normalizers')
@@ -201,9 +199,9 @@ class DataLoader:
         return None
     
     def _load_preprocessor(self, function_name: str, module_name: str = None):
-        """动态加载预处理函数"""
+        """Dynamically load preprocessing function"""
         if module_name is None:
-            # 尝试从常见模块中查找
+            # Try to find in common modules
             common_modules = ['normalizers', 'noise_processors', 'feature_engineering']
             for mod in common_modules:
                 try:
@@ -212,64 +210,64 @@ class DataLoader:
                         return func
                 except:
                     continue
-            logger.error(f"无法找到预处理器函数: {function_name}")
+            logger.error(f"Cannot find preprocessing function: {function_name}")
             return None
         
         return self._load_from_module(module_name, function_name)
     
     def _load_from_module(self, module_name: str, function_name: str):
-        """从指定模块加载函数"""
+        """Load function from specified module"""
         cache_key = f"{module_name}.{function_name}"
-        
-        # 检查缓存
+
+        # Check cache
         if cache_key in self.preprocessor_registry:
             return self.preprocessor_registry[cache_key]
         
         try:
-            # 动态导入模块
+            # Dynamically import module
             module = importlib.import_module(f"preprocessors.{module_name}")
-            
-            # 获取函数
+
+            # Get function
             if hasattr(module, function_name):
                 preprocessor_func = getattr(module, function_name)
                 self.preprocessor_registry[cache_key] = preprocessor_func
-                logger.debug(f"预处理器函数 '{function_name}' 加载成功 (模块: {module_name})")
+                logger.debug(f"Preprocessing function '{function_name}' loaded successfully (module: {module_name})")
                 return preprocessor_func
             else:
-                logger.error(f"模块 '{module_name}' 中未找到函数 '{function_name}'")
+                logger.error(f"Cannot find function '{function_name}' in module '{module_name}'")
                 return None
                 
         except ImportError:
-            logger.error(f"无法导入预处理器模块: preprocessors.{module_name}")
+            logger.error(f"Cannot import preprocessing module: preprocessors.{module_name}")
             return None
         except Exception as e:
-            logger.error(f"加载预处理器函数失败: {module_name}.{function_name}, 错误: {str(e)}")
+            logger.error(f"Failed to load preprocessing function: {module_name}.{function_name}, error: {str(e)}")
             return None
 
     def _get_scaler(self, preprocessing_config: Dict[str, Any]):
-        """根据配置获取一个 scaler 实例。"""
-        # 支持两种配置格式：
-        # 1. normalize: true/false (简化格式)
-        # 2. normalization: 'minmax'/'standard'/'none' (详细格式)
-        
-        # 优先检查简化格式
+        """Get a scaler instance based on the configuration."""
+        # Support two configuration formats:
+        # 1. normalize: true/false (simplified format)
+        # 2. normalization: 'minmax'/'standard'/'none' (detailed format)
+
+        # Check simplified format first
         if 'normalize' in preprocessing_config:
             normalize = preprocessing_config.get('normalize', False)
             if normalize is True:
-                # 默认使用 standard 标准化
+                # Default to standard normalization
                 return StandardScaler()
             elif normalize is False:
                 return None
             elif isinstance(normalize, str):
-                # 如果 normalize 是字符串，作为 normalization 类型处理
+                # If normalize is a string, treat it as normalization type
                 normalization = normalize.lower()
             else:
                 return None
         else:
-            # 检查详细格式
+            # Check detailed format
             normalization = preprocessing_config.get('normalization', 'none').lower()
-        
-        # 处理标准化类型
+
+        # Handle normalization types
         if normalization == 'minmax':
             return MinMaxScaler()
         elif normalization in ['standard', 'z-score']:
@@ -277,31 +275,31 @@ class DataLoader:
         elif normalization in ['none', 'false']:
             return None
         else:
-            logger.warning(f"未知的标准化类型: {normalization}，跳过标准化")
+            logger.warning(f"Unknown normalization type: {normalization}, skipping normalization")
             return None
     
     def _load_file(self, filename: str) -> np.ndarray:
         project_root = Path(__file__).parent.parent
         file_path = project_root / filename
         if not file_path.exists():
-            raise FileNotFoundError(f"数据文件不存在: {file_path}")
+            raise FileNotFoundError(f"Data file does not exist: {file_path}")
         
         if file_path.suffix == '.npy':
             return np.load(file_path)
         else:
-            raise ValueError(f"不支持的文件格式: {file_path.suffix}")
+            raise ValueError(f"Unsupported file format: {file_path.suffix}")
 
     def _load_data(self, dataset_name: str, dataset_config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, DataMetadata]:
-        """加载预分割的数据文件。"""
-        logger.info("加载预分割数据集...")
+        """Load pre-split data files."""
+        logger.info("Loading pre-split dataset...")
 
-        # 从配置中读取文件名
+        # Read file names from config
         train_X = self._load_file(dataset_config['train_data'])
         train_y = self._load_file(dataset_config['train_label'])
         test_X = self._load_file(dataset_config['test_data'])
         test_y = self._load_file(dataset_config['test_label'])
 
-        # 创建元数据
+        # Create metadata
         metadata = DataMetadata(
             dataset_name=dataset_name,
             fault_type='binary' if len(np.unique(train_y)) <= 2 else 'multi-class',

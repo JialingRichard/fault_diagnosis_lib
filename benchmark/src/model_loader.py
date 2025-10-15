@@ -1,10 +1,8 @@
 """
-模型加载器 (ModelLoader)
+Model Loader
 ======================
-
-负责根据配置动态加载和实例化模型
-采用简化设计：直接将配置参数映射到模型构造函数
-
+Responsible for dynamically loading and instantiating models based on configuration.
+Simplified design: directly maps config parameters to model constructors.
 """
 
 import importlib
@@ -18,26 +16,26 @@ logger = logging.getLogger(__name__)
 
 
 class ModelLoadError(Exception):
-    """模型加载异常"""
+    """model loading error"""
     pass
 
 
 class ModelLoader:
     """
-    简化的模型加载器
-    
-    直接将配置参数映射到模型构造函数，无需复杂的工厂模式
+    Simplified model loader
+
+    Directly maps config parameters to model constructor, no complex factory pattern needed
     """
     
     def __init__(self, models_dir: Optional[Union[str, Path]] = None):
-        """初始化模型加载器"""
+        """Initialize model loader"""
         if models_dir is None:
             models_dir = Path(__file__).parent.parent / "models"
         
         self.models_dir = Path(models_dir)
         self.model_registry = {}
         
-        logger.debug(f"模型加载器初始化完成，模型目录: {self.models_dir}")
+        logger.debug(f"ModelLoader initialized, models dir: {self.models_dir}")
     
     def load_model_from_config(self, 
                               model_name: str, 
@@ -45,44 +43,44 @@ class ModelLoader:
                               input_dim: int,
                               output_dim: int = None,
                               time_steps: int = None) -> nn.Module:
-        """根据配置加载模型 - 直接使用完整配置"""
-        # 基本检查
+        """Load model from config - directly use full config"""
+        # Basic checks
         if 'models' not in config or model_name not in config['models']:
             available = list(config.get('models', {}).keys())
-            raise ModelLoadError(f"配置中未找到模型 '{model_name}'，可用: {available}")
+            raise ModelLoadError(f"Model '{model_name}' not found in config. Available: {available}")
         
         model_config = config['models'][model_name]
         model_key = model_name.lower()
-        
-        # 动态导入模型（如果未注册）
+
+        # Dynamically import model (if not registered)
         if model_key not in self.model_registry:
-            # 确定类名：配置中的class字段 或 默认使用model_name
+            # Determine class name: class field in config or default to model_name
             class_name = model_config.get('class', model_name)
-            
-            # 确定模块名：配置中的module字段 或 默认使用model_name
+
+            # Determine module name: module field in config or default to model_name
             module_name = model_config.get('module', model_name)
-            
-            # 支持相对路径：如果module_name包含路径分隔符，直接使用；否则添加models.前缀
+
+            # Support relative paths: if module_name contains path separators, use it directly; otherwise, add models. prefix
             if '/' in module_name or '.' in module_name:
-                # 直接使用相对路径，将/转换为.
+                # Use relative path directly, replace / with .
                 import_path = module_name.replace('/', '.')
             else:
-                # 传统方式：添加models.前缀
+                # Traditional approach: add models. prefix
                 import_path = f"models.{module_name}"
             
             module = importlib.import_module(import_path)
             model_class = getattr(module, class_name)
             self.model_registry[model_key] = {'class': model_class}
-        
-        # 创建模型 - 过滤掉非模型参数
+
+        # Create model - filter out non-model parameters
         model_class = self.model_registry[model_key]['class']
-        
-        # 过滤配置参数：排除ModelLoader专用的元数据字段
-        non_model_params = {'class', 'module'}  # 扩展：过滤module字段
-        filtered_config = {k: v for k, v in model_config.items() 
+
+        # Filter config parameters: exclude ModelLoader-specific metadata fields
+        non_model_params = {'class', 'module'}  # Extend: filter module field
+        filtered_config = {k: v for k, v in model_config.items()
                           if k not in non_model_params}
-        
-        # 如果提供了output_dim，添加到配置中
+
+        # If output_dim is provided, add to config
         if output_dim is not None:
             filtered_config['output_dim'] = output_dim
         if time_steps is not None:
@@ -90,9 +88,8 @@ class ModelLoader:
         
         model = model_class(input_dim=input_dim, **filtered_config)
         
-        # 设置设备 - 严格按配置执行
-        # 设备从全局配置读取
+        # Set device strictly from global config
         device = (config.get('global') or {}).get('device', config.get('device', 'cpu'))
         model = model.to(device)
-        logger.info(f"模型 '{model_name}' 加载到设备: {device}")
+        logger.info(f"Model '{model_name}' moved to device: {device}")
         return model

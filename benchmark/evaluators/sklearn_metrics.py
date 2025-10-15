@@ -1,6 +1,6 @@
 """
-SKLearn 评估器集合
-包含多个基于 sklearn 的评估函数
+SKLearn-based evaluator collection.
+Contains multiple metrics implemented via scikit-learn.
 """
 
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
@@ -8,39 +8,39 @@ import numpy as np
 
 
 def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
-    """默认评估函数 - F1分数"""
+    """Default evaluator - macro F1 score."""
     return f1_score(y_test.flatten(), y_test_pred.flatten(), average='macro')
 
 
 def f1_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
-    """F1分数评估"""
+    """Macro F1 score."""
     return f1_score(y_test.flatten(), y_test_pred.flatten(), average='macro', zero_division=0)
 
 
 def precision_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
-    """精确率评估"""
+    """Macro precision."""
     return precision_score(y_test.flatten(), y_test_pred.flatten(), average='macro', zero_division=0)
 
 
 def recall_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
-    """召回率评估"""
+    """Macro recall."""
     return recall_score(y_test.flatten(), y_test_pred.flatten(), average='macro', zero_division=0)
 
 
 def accuracy_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
-    """准确率评估"""
+    """Accuracy."""
     return accuracy_score(y_test.flatten(), y_test_pred.flatten())
 
 
 def f1_micro_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
-    """F1分数 - micro平均"""
+    """Micro F1 score."""
     return f1_score(y_test.flatten(), y_test_pred.flatten(), average='micro')
 
 
 def train_test_gap_evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
-    """训练测试性能差距评估 - 演示使用训练集数据"""
+    """Absolute gap between train and test macro F1 (smaller is better)."""
     train_f1 = f1_score(y_train.flatten(), y_train_pred.flatten(), average='macro')
     test_f1 = f1_score(y_test.flatten(), y_test_pred.flatten(), average='macro')
     
-    # 返回性能差距（越小越好）
+    # Return absolute performance gap (smaller is better)
     return abs(train_f1 - test_f1)
