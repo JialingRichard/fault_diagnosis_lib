@@ -352,6 +352,62 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
         dataset_info = exp.get('dataset', 'N/A')
         print(f"   {i}. {exp['name']} ({exp['model']} on {dataset_info})")
     print()
+
+    # 预检（可选）：在大规模训练前，快速验证 monitor evaluator 是否可用且返回数值
+    gcfg = (config.get('global') or {})
+    if gcfg.get('pre_test', False):
+        print("预检阶段: 验证各实验的 monitor 配置与 evaluator 可用性…")
+        pretest_failures = []
+        eval_loader = EvalLoader()
+        from src.model_loader import ModelLoader as _ML
+        _ml = _ML()
+        from src.data_loader import DataLoader as _DL
+        _dl = _DL()
+        device = gcfg.get('device', 'cpu')
+        for exp in experiments:
+            try:
+                # 数据与模型
+                X_train, X_test, y_train, y_test, metadata = _dl.prepare_data(config, exp['dataset'])
+                model = _ml.load_model_from_config(
+                    exp['model'], config,
+                    input_dim=metadata.feature_dim,
+                    output_dim=metadata.num_classes,
+                    time_steps=X_train.shape[1] if len(X_train.shape) > 1 else None
+                )
+                # 取一个小子集进行预测
+                import torch
+                model.eval()
+                n = min(2, len(X_test))
+                X_sub = torch.FloatTensor(X_test[:n]).to(device)
+                with torch.no_grad():
+                    out = model(X_sub)
+                    if len(out.shape) == 3:
+                        out = out[:, -1, :]
+                    y_pred = torch.argmax(out, dim=1).cpu().numpy()
+                y_true = y_test[:n].flatten()
+
+                # 读取 epochinfo/monitor 配置
+                tcfg = config['training_templates'][exp['training']]
+                ep_t = tcfg.get('epochinfo')
+                mon = tcfg.get('monitor', {})
+                metric = mon['metric']
+                mode = mon['mode']
+                split = mon['split']
+                # 取对应模板与指标
+                tpl = config['evaluation_templates'][ep_t]
+                metric_map = {k: v for k, v in tpl.items() if not str(k).startswith('_')} if 'metrics' not in tpl else tpl['metrics']
+                mcfg = metric_map[metric]
+                # 加载 evaluator 并计算（仅测试返回类型）
+                evaluator = eval_loader._load_evaluator(metric, mcfg)
+                val = evaluator([], [], [], None, y_true, y_pred)
+                float(val)  # 强制可转 float
+                print(f"   预检通过: {exp['name']} | Monitor:{metric}-{mode}-{split}")
+            except Exception as e:
+                pretest_failures.append((exp['name'], str(e)))
+                print(f"   预检失败: {exp['name']} | 错误: {e}")
+        if pretest_failures:
+            raise RuntimeError(f"预检失败 {len(pretest_failures)} 个实验: {[n for n,_ in pretest_failures]}")
+        print("预检完成: 所有实验的 monitor evaluator 均可用\n")
     
     # 2. 初始化系统组件（包括结果管理器）
     print("步骤 2: 初始化系统组件")
