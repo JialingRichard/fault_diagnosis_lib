@@ -365,6 +365,7 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
         _dl = _DL()
         device = gcfg.get('device', 'cpu')
         for exp in experiments:
+            logging.getLogger(__name__).debug(f"预检开始: {exp['name']}")
             try:
                 # 数据与模型
                 X_train, X_test, y_train, y_test, metadata = _dl.prepare_data(config, exp['dataset'])
@@ -374,37 +375,79 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
                     output_dim=metadata.num_classes,
                     time_steps=X_train.shape[1] if len(X_train.shape) > 1 else None
                 )
-                # 取一个小子集进行预测
+                # 取训练集的极小子集进行一次前向，复用到所有校验
                 import torch
                 model.eval()
-                n = min(2, len(X_test))
-                X_sub = torch.FloatTensor(X_test[:n]).to(device)
+                n = min(2, len(X_train))
+                X_sub = torch.FloatTensor(X_train[:n]).to(device)
                 with torch.no_grad():
                     out = model(X_sub)
                     if len(out.shape) == 3:
                         out = out[:, -1, :]
-                    y_pred = torch.argmax(out, dim=1).cpu().numpy()
-                y_true = y_test[:n].flatten()
+                    y_pred_sub = torch.argmax(out, dim=1).cpu().numpy()
+                y_true_sub = y_train[:n].flatten()
 
                 # 读取 epochinfo/monitor 配置
                 tcfg = config['training_templates'][exp['training']]
                 ep_t = tcfg.get('epochinfo')
                 mon = tcfg.get('monitor', {})
+                # 更友好的缺参提示，避免 KeyError('split') 这类含糊错误
+                required_keys = ('metric', 'mode', 'split')
+                missing = [k for k in required_keys if k not in mon]
+                if missing:
+                    raise KeyError(f"monitor 缺少必填字段: {missing}")
                 metric = mon['metric']
                 mode = mon['mode']
                 split = mon['split']
                 # 取对应模板与指标
                 tpl = config['evaluation_templates'][ep_t]
                 metric_map = {k: v for k, v in tpl.items() if not str(k).startswith('_')} if 'metrics' not in tpl else tpl['metrics']
-                mcfg = metric_map[metric]
-                # 加载 evaluator 并计算（仅测试返回类型）
-                evaluator = eval_loader._load_evaluator(metric, mcfg)
-                val = evaluator([], [], [], None, y_true, y_pred)
-                float(val)  # 强制可转 float
-                print(f"   预检通过: {exp['name']} | Monitor:{metric}-{mode}-{split}")
+                # 逐一加载并运行 epochinfo 模板下的所有指标；仅对 monitor 指标强制为数值
+                for m_name, m_cfg in metric_map.items():
+                    evaluator = eval_loader._load_evaluator(m_name, m_cfg)
+                    try:
+                        # 用训练子集同时填入 train/test 通道，仅做可运行性校验
+                        val = evaluator(
+                            X_train[:n], y_true_sub, y_pred_sub,
+                            X_train[:n], y_true_sub, y_pred_sub
+                        )
+                        if m_name == metric:
+                            float(val)
+                    except Exception as e:
+                        raise RuntimeError(f"指标 '{m_name}' 预检失败: {e}")
+
+                # 最终评估模板：仅校验不报错，不强制数值
+                final_tpl_name = exp.get('evaluation')
+                metric_map_final = {}
+                if final_tpl_name:
+                    tpl_final = config['evaluation_templates'][final_tpl_name]
+                    metric_map_final = {k: v for k, v in tpl_final.items() if not str(k).startswith('_')} if 'metrics' not in tpl_final else tpl_final['metrics']
+                    for m_name, m_cfg in metric_map_final.items():
+                        evaluator_f = eval_loader._load_evaluator(m_name, m_cfg)
+                        try:
+                            _ = evaluator_f(
+                                X_train[:n], y_true_sub, y_pred_sub,
+                                X_train[:n], y_true_sub, y_pred_sub
+                            )
+                        except Exception as e:
+                            raise RuntimeError(f"最终评估指标 '{m_name}' 预检失败: {e}")
+
+                print(f"   预检通过: {exp['name']} | Monitor:{metric}-{mode}-{split} | 模板 '{ep_t}' 共{len(metric_map)}项 | 最终模板 '{final_tpl_name}' 共{len(metric_map_final) if final_tpl_name else 0}项")
             except Exception as e:
+                # 记录到控制台与日志（包含完整栈）
                 pretest_failures.append((exp['name'], str(e)))
                 print(f"   预检失败: {exp['name']} | 错误: {e}")
+                logging.getLogger(__name__).exception(f"预检失败: {exp['name']} | 详情")
+                # 写入 error.log，包含上下文与堆栈
+                try:
+                    import traceback
+                    exp_ctx = (
+                        f"Experiment: {exp['name']}\n"
+                        f"Model:{exp['model']} | Data:{exp.get('dataset','N/A')} | Train:{exp.get('training','N/A')} | Eval:{exp.get('evaluation','N/A')}\n"
+                    )
+                    result_manager.log_experiment_error(exp_ctx, traceback.format_exc())
+                except Exception:
+                    pass
         if pretest_failures:
             raise RuntimeError(f"预检失败 {len(pretest_failures)} 个实验: {[n for n,_ in pretest_failures]}")
         print("预检完成: 所有实验的 monitor evaluator 均可用\n")
@@ -814,7 +857,6 @@ def main():
     # 设置日志
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    setup_logging()
     
     # 检查配置文件
     if not os.path.exists(args.config):

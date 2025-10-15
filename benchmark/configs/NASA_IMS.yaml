@@ -7,6 +7,7 @@ global:
   # 运行设备与ckpt策略
   device: 'cuda'           # 'cuda' 或 'cpu'
   checkpoint_policy: 'best'  # 'best' 仅保留最优；'all' 每个epoch都保存
+  pre_test: false            # 训练前预检各实验的 monitor evaluator 可用性
 
   # 项目信息（原 experiment_info 扁平化）
   author: Benchmark Team
@@ -109,19 +110,27 @@ training_templates:
     optimizer: 'adam'
     print_interval: 1   # 每轮都打印
     data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
+    # use_test_as_val: true  # 使用测试集作为验证集, 危险操作
     validation_split: 0.2  # 从训练集中划分20%作为验证集
-    # 训练期指标与可视化：直接引用 evaluation_templates 下的模板名
-    epochinfo: 'default'
-
+    # 训练期指标与可视化：使用轻量模板（仅accuracy）
+    epochinfo: 'train_acc'
+    # 训练期评估使用的数据划分（默认 val，避免信息泄露）
     # 最优ckpt监控：强制指定监控来源与规则
     # 监控模板隐含为上面的 epochinfo 指定模板
     monitor:
-      metric: 'f1'              # 指标名（需在模板中已定义）
+      metric: 'accuracy'        # 指标名（需在模板中已定义）
       mode: 'max'               # 'min' 或 'max'（需显式指定）
-      split: 'val'              # 监控验证集(val)或测试集(test)
+      split: 'val'             # 'val', 'test'（需显式指定）
+
 
 # 评估配置模板
 evaluation_templates:
+  # 训练期轻量模板：仅accuracy（用于快速监控与best选择）
+  train_acc:
+    accuracy:
+      file: sklearn_metrics
+      function: accuracy_evaluate
+
   default:
     f1:
       # 默认：evaluators/f1.py 的 evaluate 函数

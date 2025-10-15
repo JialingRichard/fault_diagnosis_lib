@@ -164,22 +164,40 @@ class EpochInfoLoader:
             trainer = epoch_data.get('trainer')
             if trainer:
                 try:
-                    # 获取当前预测结果
-                    train_pred = trainer.predict(trainer.X_train)
-                    test_pred = trainer.predict(trainer.X_test)
-                    
-                    # 确保数据都是numpy数组
+                    # split: 训练期评估默认使用验证集，避免信息泄露
+                    epochinfo_split = str(getattr(trainer, 'config', {}).get('epochinfo_split', 'val')).lower()
+                    if epochinfo_split not in {'val', 'test'}:
+                        epochinfo_split = 'val'
+
+                    # 获取/缓存需要的预测
+                    train_pred = epoch_data.get('train_pred')
+                    if train_pred is None:
+                        train_pred = trainer.predict(trainer.X_train)
+
+                    if epochinfo_split == 'val':
+                        # 选择验证集作为评估“test通道”
+                        sel_X = trainer.X_val
+                        sel_y = trainer.y_val
+                        sel_pred = getattr(trainer, '_cached_val_pred', None)
+                        if sel_pred is None:
+                            sel_pred = trainer.predict(trainer.X_val)
+                    else:  # 'test'
+                        sel_X = trainer.X_test
+                        sel_y = trainer.y_test
+                        sel_pred = epoch_data.get('test_pred') or getattr(trainer, '_cached_test_pred', None)
+                        if sel_pred is None:
+                            sel_pred = trainer.predict(trainer.X_test)
+
+                    # 准备 numpy 标签
                     X_train = trainer.X_train
                     y_train = trainer.y_train
-                    X_test = trainer.X_test 
-                    y_test = trainer.y_test
-                    
-                    # 转换tensor到numpy
                     if hasattr(y_train, 'cpu'):
                         y_train = y_train.cpu().numpy()
-                    if hasattr(y_test, 'cpu'):
-                        y_test = y_test.cpu().numpy()
-                    
+                    if hasattr(sel_y, 'cpu'):
+                        y_sel_np = sel_y.cpu().numpy()
+                    else:
+                        y_sel_np = sel_y
+
                     # 为评估器设置上下文（plots目录、epoch信息）
                     if hasattr(trainer, 'result_manager') and trainer.result_manager:
                         plots_dir = trainer.result_manager.get_experiment_plot_dir(trainer.experiment_name)
@@ -193,17 +211,21 @@ class EpochInfoLoader:
                     original_level = logging.getLogger('src.eval_loader').level
                     logging.getLogger('src.eval_loader').setLevel(logging.WARNING)
                     
+                    # 将选定 split 作为 evaluator 的“test通道”输入
                     eval_results = self.eval_loader.evaluate(
                         config, eval_template_name,
                         X_train, y_train, train_pred,
-                        X_test, y_test, test_pred
+                        sel_X, y_sel_np, sel_pred
                     )
                     
                     # 恢复日志级别
                     logging.getLogger('src.eval_loader').setLevel(original_level)
                     
-                    # 构建评估结果字符串
-                    metrics_str = " | " + " | ".join([f"{k}={v:.3f}" for k, v in eval_results.items() if v is not None])
+                    # 构建评估结果字符串，附带 split 标签
+                    split_tag = f"split:{epochinfo_split}"
+                    metrics_parts = [f"{k}={v:.3f}" for k, v in eval_results.items() if v is not None]
+                    metrics_parts.append(split_tag)
+                    metrics_str = " | " + " | ".join(metrics_parts)
                     
                 except Exception as e:
                     logger.warning(f"计算评估指标失败: {e}")

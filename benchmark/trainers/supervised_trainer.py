@@ -63,9 +63,10 @@ class SupervisedTrainer:
             
             print(f"   数据子集: {data_fraction:.1%} ({train_size:,}训练 + {test_size:,}测试)")
         
-        # 从训练集中划分验证集
-        validation_split = config.get('validation_split', 0.2)
-        if validation_split > 0.0 and validation_split < 1.0:
+        # 从训练集中划分验证集（不再提供隐式默认，需显式配置）
+        validation_split = config.get('validation_split', None)
+        use_test_as_val = bool(config.get('use_test_as_val', False))
+        if isinstance(validation_split, (int, float)) and validation_split > 0.0 and validation_split < 1.0:
             from sklearn.model_selection import train_test_split
             
             # 检查是否可以使用分层抽样（每个类至少2个样本）
@@ -102,10 +103,16 @@ class SupervisedTrainer:
             self.X_val = torch.FloatTensor(X_val).to(device)
             self.y_val = torch.LongTensor(y_val.flatten()).to(device)
         else:
-            # 如果没有配置验证集划分，使用测试集作为验证集（保持原有行为）
-            print(f"   警告: 未配置validation_split，使用测试集作为验证集（可能导致数据泄露）")
-            self.X_val = torch.FloatTensor(X_test).to(device)
-            self.y_val = torch.LongTensor(y_test.flatten()).to(device)
+            # 未显式配置有效的 validation_split
+            if use_test_as_val:
+                print(f"   警告: 使用测试集作为验证集（use_test_as_val=True，可能导致信息泄露）")
+                self.X_val = torch.FloatTensor(X_test).to(device)
+                self.y_val = torch.LongTensor(y_test.flatten()).to(device)
+            else:
+                raise ValueError(
+                    "未配置有效的 validation_split 且未显式允许使用测试集作为验证集。"
+                    "请在训练模板中设置 validation_split∈(0,1)，或将 use_test_as_val 设为 true（自担风险）。"
+                )
         
         # 数据转换
         self.X_train = torch.FloatTensor(X_train).to(device)
@@ -141,6 +148,10 @@ class SupervisedTrainer:
         self.result_manager = None  # 将由外部设置
         self.experiment_name = None  # 将由外部设置
         self.best_checkpoint_path = None  # 记录最优checkpoint
+        # 缓存本轮预测，避免重复计算
+        self._cached_train_pred = None
+        self._cached_val_pred = None
+        self._cached_test_pred = None
         
         # 读取全局与监控配置（强约束）
         gcfg = (self.full_config.get('global') or {}) if isinstance(self.full_config, dict) else {}
@@ -159,6 +170,12 @@ class SupervisedTrainer:
         self.monitor_split = str(monitor_cfg['split']).lower()
         if self.monitor_split not in {'val','test'}:
             raise ValueError("monitor.split 必须为 'val' 或 'test'")
+        if self.monitor_split == 'test':
+            print("   警告: monitor.split 使用了 'test'，将以测试集指标选择最优（可能导致信息泄露）")
+        # 训练期评估 split（用于日志提示；实际选择在 epochinfo_loader 中执行）
+        self.epochinfo_split = str(self.config.get('epochinfo_split', 'val')).lower()
+        if self.epochinfo_split == 'test':
+            print("   警告: epochinfo_split 使用了 'test'，训练期评估将基于测试集（可能导致信息泄露）")
         # 校验模板与指标存在
         eval_templates = (self.full_config.get('evaluation_templates') or {})
         if self.epochinfo_template not in eval_templates:
@@ -207,6 +224,21 @@ class SupervisedTrainer:
             # 验证阶段
             val_loss = self._validate()
             
+            # 生成本轮需要的预测，供打印与monitor复用
+            try:
+                self._cached_train_pred = self.predict(self.X_train)
+            except Exception:
+                self._cached_train_pred = None
+            try:
+                # 验证与测试都计算，避免二次调用
+                self._cached_val_pred = self.predict(self.X_val)
+            except Exception:
+                self._cached_val_pred = None
+            try:
+                self._cached_test_pred = self.predict(self.X_test)
+            except Exception:
+                self._cached_test_pred = None
+
             # 记录历史
             self.training_history['train_loss'].append(train_loss)
             self.training_history['val_loss'].append(val_loss)
@@ -225,14 +257,10 @@ class SupervisedTrainer:
 
             # 计算监控值并按策略保存checkpoint
             monitor_value = self._compute_monitor_value(val_loss)
-            save_now = False
-            if self.checkpoint_policy == 'best':
-                better = (monitor_value < self.best_monitor_value) if self.monitor_mode == 'min' else (monitor_value > self.best_monitor_value)
-                if better:
-                    self.best_monitor_value = monitor_value
-                    save_now = True
-            elif self.checkpoint_policy == 'all':
-                save_now = True
+            # 判定是否更优
+            better = (monitor_value < self.best_monitor_value) if self.monitor_mode == 'min' else (monitor_value > self.best_monitor_value)
+            # 保存策略
+            save_now = (self.checkpoint_policy == 'all') or (self.checkpoint_policy == 'best' and better)
             
             if save_now and self.result_manager and self.experiment_name:
                 ckpt_path = self.result_manager.save_checkpoint(
@@ -240,17 +268,14 @@ class SupervisedTrainer:
                     epoch + 1, val_loss  # 文件名仍包含验证损失
                 )
                 try:
-                    # 维护 best.pth 以便最终评估快速加载
-                    if self.checkpoint_policy == 'best':
-                        best_path = ckpt_path.parent / 'best.pth'
-                        shutil.copy2(ckpt_path, best_path)
-                        self.best_checkpoint_path = best_path
-                    else:
-                        # all 策略：仍记录首次生成的best引用
-                        if self.best_checkpoint_path is None:
-                            self.best_checkpoint_path = ckpt_path
-                except Exception:
-                    pass
+                    # 若本轮更优，更新最佳引用
+                    if better:
+                        if self.checkpoint_policy == 'best' or self.checkpoint_policy == 'all':
+                            best_path = ckpt_path.parent / 'best.pth'
+                            shutil.copy2(ckpt_path, best_path)
+                            self.best_checkpoint_path = best_path
+                except Exception as e:
+                    logging.getLogger(__name__).debug(f"维护best.pth失败: {e}")
             
             # 打印epoch信息（使用模块化系统）
             if epoch % print_interval == 0 or epoch == epochs - 1:
@@ -263,6 +288,9 @@ class SupervisedTrainer:
                     'patience_counter': self.patience_counter,
                     'patience': patience,
                     'learning_rate': self.optimizer.param_groups[0]['lr'],
+                    # 复用已计算的预测
+                    'train_pred': self._cached_train_pred,
+                    'test_pred': self._cached_test_pred,
                     # 提供计算准确率的方法，但不主动计算
                     'trainer': self
                 }
@@ -325,12 +353,14 @@ class SupervisedTrainer:
         if self.monitor_split == 'val':
             X_t = self.X_val
             y_t = self.y_val
+            y_pred_cached = self._cached_val_pred
         else:
             X_t = self.X_test
             y_t = self.y_test
+            y_pred_cached = self._cached_test_pred
 
-        # 预测
-        y_t_pred = self.predict(X_t)
+        # 预测（优先复用缓存）
+        y_t_pred = y_pred_cached if y_pred_cached is not None else self.predict(X_t)
         y_t_np = y_t.cpu().numpy() if hasattr(y_t, 'cpu') else y_t
 
         # 通过 eval_loader 仅计算单一指标
