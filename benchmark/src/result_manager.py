@@ -123,6 +123,16 @@ class ResultManager:
             fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         ))
+        # 过滤掉 matplotlib.font_manager 的 findfont 噪音
+        class _MatplotlibFindfontFilter(logging.Filter):
+            def filter(self, record: logging.LogRecord) -> bool:
+                try:
+                    if str(record.name).startswith('matplotlib.font_manager') and 'findfont' in str(record.getMessage()):
+                        return False
+                except Exception:
+                    pass
+                return True
+        debug_handler.addFilter(_MatplotlibFindfontFilter())
         key_debug = type(debug_handler).__name__ + str(debug_log_path)
         if key_debug not in existing:
             root_logger.addHandler(debug_handler)
@@ -138,6 +148,12 @@ class ResultManager:
         key_error = type(error_handler).__name__ + str(error_log_path)
         if key_error not in existing:
             root_logger.addHandler(error_handler)
+
+        # 降低 matplotlib.font_manager 的日志噪音
+        try:
+            logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+        except Exception:
+            pass
     
     def _save_config_snapshot(self, config_file: str):
         """保存配置文件快照"""
@@ -157,8 +173,7 @@ class ResultManager:
     
     def save_checkpoint(self, experiment_name: str, model: torch.nn.Module, 
                        optimizer: torch.optim.Optimizer, epoch: int, 
-                       val_loss: float, metrics: Dict[str, float] = None,
-                       logging_level: str = 'normal'):
+                       val_loss: float, metrics: Dict[str, float] = None):
         """保存checkpoint"""
         exp_dir = self.create_experiment_dir(experiment_name)
         checkpoint_dir = exp_dir / "checkpoints"
@@ -178,9 +193,8 @@ class ResultManager:
         
         torch.save(checkpoint, checkpoint_path)
         
-        # 根据日志等级决定是否显示（仅在 verbose 下提示，避免干扰epoch单行输出）
-        if logging_level in ['verbose']:
-            print(f"Checkpoint保存: {checkpoint_name}")
+        # 不在控制台插入额外行；详细信息写入 debug.log（由全局日志控制）
+        logging.getLogger(__name__).debug(f"Checkpoint保存: {checkpoint_path}")
 
         return checkpoint_path
     

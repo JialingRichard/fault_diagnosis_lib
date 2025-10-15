@@ -71,10 +71,12 @@ class TrainingLoader:
         trainer_class = self._load_trainer_class(training_type, training_config)
         
         # 创建训练器实例
+        # 从全局配置获取设备
+        device = (config.get('global') or {}).get('device', config.get('device', 'cpu'))
         trainer = trainer_class(
             model=model,
             config=training_config,
-            device=config.get('device', 'cpu'),
+            device=device,
             X_train=X_train,
             y_train=y_train,
             X_test=X_test,

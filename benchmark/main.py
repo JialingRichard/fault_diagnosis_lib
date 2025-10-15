@@ -12,6 +12,45 @@ import os
 import sys
 import argparse
 import logging
+import time
+
+def _set_global_seed(cfg):
+    """统一设置 Python/NumPy/PyTorch 的随机种子与可选确定性。
+
+    读取配置中的 `global.seed` 与 `global.deterministic`（可选），
+    若未提供 seed，则使用固定默认 42。
+    """
+    try:
+        import random
+        import numpy as np
+        import torch
+    except Exception:
+        # 依赖缺失时尽量不影响主流程
+        return None
+
+    gcfg = (cfg or {}).get('global', {}) if isinstance(cfg, dict) else {}
+    seed = gcfg.get('seed', 42)
+    deterministic = bool(gcfg.get('deterministic', False))
+
+    # Python/NumPy
+    random.seed(seed)
+    np.random.seed(seed)
+
+    # PyTorch CPU/CUDA
+    try:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        # 确定性（可选，可能降低性能）
+        torch.backends.cudnn.deterministic = deterministic
+        # 为了确定性，关闭 benchmark；若不要求确定性，可由用户自行配置
+        if deterministic:
+            torch.backends.cudnn.benchmark = False
+    except Exception:
+        pass
+
+    print(f"全局随机种子: {seed} | 确定性: {deterministic}")
+    return seed
 
 # 确保从benchmark目录运行并设置路径
 benchmark_dir = os.path.dirname(os.path.abspath(__file__))
@@ -276,6 +315,9 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     Args:
         config_file: 配置文件路径
     """
+    # 提前初始化结果管理器，使所有后续输出进入 run/debug 日志
+    result_manager = ResultManager(config_file)
+    
     print("=" * 80)
     print("Fault Diagnosis Library - 故障诊断基准测试")
     print("=" * 80)
@@ -287,7 +329,17 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     print("步骤 1: 加载实验配置")
     config_loader = ConfigLoader(config_file)
     config = config_loader.load_config()
+    # 1.1 设置全局随机种子（可从配置 global.seed 读取）
+    _set_global_seed(config)
     
+    # 打印全局信息
+    gcfg = (config.get('global') or {})
+    print("全局配置:")
+    print(f"  device: {gcfg.get('device', 'cpu')} | seed: {gcfg.get('seed', 'N/A')} | deterministic: {gcfg.get('deterministic', False)} | ckpt_policy: {gcfg.get('checkpoint_policy', 'best')}")
+    if any(k in gcfg for k in ('author','version','date')):
+        print(f"  author: {gcfg.get('author','-')} | version: {gcfg.get('version','-')} | date: {gcfg.get('date','-')}")
+    print()
+
     # 1.5 展开数据集合集
     config = expand_dataset_collections(config)
     
@@ -303,7 +355,6 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     
     # 2. 初始化系统组件（包括结果管理器）
     print("步骤 2: 初始化系统组件")
-    result_manager = ResultManager(config_file)
     data_loader = DataLoader()
     model_loader = ModelLoader()
     training_loader = TrainingLoader()
@@ -317,11 +368,21 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
     for exp_idx, experiment in enumerate(experiments, 1):
         print(f"\n{'='*20} 实验 {exp_idx}/{len(experiments)}: {experiment['name']} {'='*20}")
         
-        # 获取训练配置中的epochinfo信息
+        # 获取训练配置中的epochinfo与monitor信息
         training_config = config['training_templates'][experiment['training']]
         epochinfo_name = training_config.get('epochinfo', 'default')
-        
-        print(f"Model:{experiment['model']} | Data:{experiment['dataset']} | Train:{experiment['training']} | Epoch:{epochinfo_name} | Eval:{experiment['evaluation']}")
+        monitor_cfg = training_config.get('monitor', {}) or {}
+        monitor_str = ""
+        try:
+            m_metric = str(monitor_cfg.get('metric', '')).strip()
+            m_mode = str(monitor_cfg.get('mode', '')).strip()
+            m_split = str(monitor_cfg.get('split', '')).strip()
+            if m_metric and m_mode and m_split:
+                monitor_str = f" | Monitor:{m_metric}-{m_mode}-{m_split}"
+        except Exception:
+            pass
+
+        print(f"Model:{experiment['model']} | Data:{experiment['dataset']} | Train:{experiment['training']} | Epoch:{epochinfo_name} {monitor_str} | Eval:{experiment['evaluation']}")
         print("-" * 80)
         
         try:
@@ -394,12 +455,9 @@ def run_experiments(config_file: str = 'configs/default_experiment.yaml'):
             plots_dir = result_manager.get_experiment_plot_dir(experiment['name'])
             
             # 设置评估器上下文（用于图像保存等）
-            training_config = config['training_templates'][experiment['training']]
-            logging_level = training_config.get('logging_level', 'normal')
             eval_loader.set_context(
                 plots_dir=plots_dir,
-                epoch_info=None,  # None表示最终评估，会保存到主plots目录
-                logging_level=logging_level
+                epoch_info=None  # None表示最终评估，会保存到主plots目录
             )
             
             eval_results = eval_loader.evaluate(

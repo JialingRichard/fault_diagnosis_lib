@@ -38,22 +38,19 @@ class EvalLoader:
         # 评估上下文信息
         self.plots_dir = None
         self.epoch_info = None  # {'epoch': 10} 表示在训练的第10轮，None表示最终评估
-        self.logging_level = 'normal'
         
         logger.debug(f"评估加载器初始化完成，评估器目录: {self.evaluators_dir}")
     
-    def set_context(self, plots_dir=None, epoch_info=None, logging_level='normal'):
+    def set_context(self, plots_dir=None, epoch_info=None):
         """
         设置评估上下文信息
         
         Args:
             plots_dir: 图片保存目录
             epoch_info: epoch信息字典，如 {'epoch': 10}，None表示最终评估
-            logging_level: 日志等级 ('minimal', 'normal', 'verbose')
         """
         self.plots_dir = Path(plots_dir) if plots_dir else None
         self.epoch_info = epoch_info
-        self.logging_level = logging_level
     
     def evaluate(self, config: Dict[str, Any], eval_template_name: str,
                 X_train: np.ndarray, y_train: np.ndarray, y_train_pred: np.ndarray,
@@ -79,7 +76,11 @@ class EvalLoader:
             raise EvalLoadError(f"评估模板 '{eval_template_name}' 不存在，可用: {available}")
         
         eval_config = config['evaluation_templates'][eval_template_name]
-        metrics = eval_config.get('metrics', {})
+        # 支持扁平化模板：若无 metrics 键，则将非保留键视为指标配置
+        if isinstance(eval_config, dict) and 'metrics' not in eval_config:
+            metrics = {k: v for k, v in eval_config.items() if not str(k).startswith('_')}
+        else:
+            metrics = eval_config.get('metrics', {})
         
         if not metrics:
             raise EvalLoadError(f"评估模板 '{eval_template_name}' 中没有定义指标")
@@ -165,8 +166,7 @@ class EvalLoader:
             保存成功返回1.0，失败返回0.0
         """
         if self.plots_dir is None:
-            if self.logging_level in ['normal', 'verbose']:
-                logger.warning(f"未设置plots_dir，无法保存图像: {metric_name}")
+            logger.warning(f"未设置plots_dir，无法保存图像: {metric_name}")
             import matplotlib.pyplot as plt
             plt.close(fig)
             return 0.0
@@ -192,9 +192,8 @@ class EvalLoader:
             # 保存图像
             fig.savefig(save_path, dpi=300, bbox_inches='tight')
             
-            # 根据日志等级决定是否显示保存信息
-            if self.logging_level in ['normal', 'verbose']:
-                logger.info(f"图像已保存: {save_path}")
+            # 记录保存信息（统一交给日志级别控制输出位置）
+            logger.info(f"图像已保存: {save_path}")
             
             # 关闭图形释放内存
             import matplotlib.pyplot as plt

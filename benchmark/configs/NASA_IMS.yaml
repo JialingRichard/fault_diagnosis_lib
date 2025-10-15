@@ -1,7 +1,14 @@
-# 全局设备设置
-device: 'cuda'
-# 实验配置信息
-experiment_info:
+# 全局设置（统一元信息与运行环境）
+global:
+  # 复现相关
+  seed: 42                 # 全局随机种子（Python/NumPy/PyTorch）
+  deterministic: false     # 设为 true 可获得更强确定性（可能降低性能）
+  
+  # 运行设备与ckpt策略
+  device: 'cuda'           # 'cuda' 或 'cpu'
+  checkpoint_policy: 'best'  # 'best' 仅保留最优；'all' 每个epoch都保存
+
+  # 项目信息（原 experiment_info 扁平化）
   author: Benchmark Team
   date: '2025-09-24'
   description: 多模型多数据集对比实验框架
@@ -103,36 +110,33 @@ training_templates:
     print_interval: 1   # 每轮都打印
     data_fraction: 0.01  # 只使用1%的数据集，用于超快速调试
     validation_split: 0.2  # 从训练集中划分20%作为验证集
-    logging_level: 'normal'  # 显示重要事件但不过度冗余
-    epochinfo: 'with_metrics'  # 显示训练过程中的评估指标和图片
+    # 训练期指标与可视化：直接引用 evaluation_templates 下的模板名
+    epochinfo: 'default'
 
-# Epoch信息打印配置模板
-epochinfo_templates:
-  nothing:
-    format: 'default'  # 只显示基本的epoch信息（训练损失、验证损失）
-  with_metrics:
-    evaluation: 'default'  # 使用evaluation_templates中的default模板计算指标
+    # 最优ckpt监控：强制指定监控来源与规则
+    # 监控模板隐含为上面的 epochinfo 指定模板
+    monitor:
+      metric: 'f1'              # 指标名（需在模板中已定义）
+      mode: 'max'               # 'min' 或 'max'（需显式指定）
+      split: 'val'              # 监控验证集(val)或测试集(test)
 
 # 评估配置模板
 evaluation_templates:
   default:
-    metrics:
-      f1:
-        # 默认：evaluators/f1.py 的 evaluate 函数
-      precision:
-        file: sklearn_metrics  # 使用 sklearn_metrics.py
-        function: precision_evaluate  # 调用 precision_evaluate 函数
-      recall:
-        file: sklearn_metrics
-        function: recall_evaluate
-      accuracy:
-        file: sklearn_metrics
-        function: accuracy_evaluate
-      train_test_gap:
-        file: sklearn_metrics
-        function: train_test_gap_evaluate
-      test_samples:
-        file: plot_label_distribution  # 使用 plot_label_distribution.py
-        function: evaluate  # 会生成标签分布图
-
-
+    f1:
+      # 默认：evaluators/f1.py 的 evaluate 函数
+    precision:
+      file: sklearn_metrics  # 使用 sklearn_metrics.py
+      function: precision_evaluate  # 调用 precision_evaluate 函数
+    recall:
+      file: sklearn_metrics
+      function: recall_evaluate
+    accuracy:
+      file: sklearn_metrics
+      function: accuracy_evaluate
+    train_test_gap:
+      file: sklearn_metrics
+      function: train_test_gap_evaluate
+    test_samples:
+      file: plot_label_distribution  # 使用 plot_label_distribution.py
+      function: evaluate  # 会生成标签分布图

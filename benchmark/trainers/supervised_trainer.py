@@ -10,6 +10,7 @@ from typing import Dict, Any, Tuple
 import numpy as np
 import logging
 import sys
+import shutil
 from pathlib import Path
 
 # 添加src目录到路径
@@ -141,6 +142,36 @@ class SupervisedTrainer:
         self.experiment_name = None  # 将由外部设置
         self.best_checkpoint_path = None  # 记录最优checkpoint
         
+        # 读取全局与监控配置（强约束）
+        gcfg = (self.full_config.get('global') or {}) if isinstance(self.full_config, dict) else {}
+        self.checkpoint_policy = gcfg.get('checkpoint_policy', 'best')
+        self.epochinfo_template = self.config.get('epochinfo', None)
+        monitor_cfg = self.config.get('monitor', None)
+        if not self.epochinfo_template or not monitor_cfg:
+            raise ValueError("训练模板缺少必填字段：epochinfo 与 monitor")
+        required_monitor = {'metric', 'mode', 'split'}
+        if not required_monitor.issubset(monitor_cfg.keys()):
+            raise ValueError(f"monitor 配置缺少必填字段：{required_monitor}")
+        self.monitor_metric = str(monitor_cfg['metric'])
+        self.monitor_mode = str(monitor_cfg['mode']).lower()
+        if self.monitor_mode not in {'min','max'}:
+            raise ValueError("monitor.mode 必须为 'min' 或 'max'")
+        self.monitor_split = str(monitor_cfg['split']).lower()
+        if self.monitor_split not in {'val','test'}:
+            raise ValueError("monitor.split 必须为 'val' 或 'test'")
+        # 校验模板与指标存在
+        eval_templates = (self.full_config.get('evaluation_templates') or {})
+        if self.epochinfo_template not in eval_templates:
+            raise ValueError(f"epochinfo 指向的评估模板不存在: {self.epochinfo_template}")
+        tpl = eval_templates[self.epochinfo_template]
+        if isinstance(tpl, dict) and 'metrics' not in tpl:
+            metric_map = {k: v for k, v in tpl.items() if not str(k).startswith('_')}
+        else:
+            metric_map = tpl.get('metrics', {})
+        if self.monitor_metric not in metric_map:
+            raise ValueError(f"monitor.metric '{self.monitor_metric}' 不在模板 '{self.epochinfo_template}' 中")
+        self.best_monitor_value = float('inf') if self.monitor_mode == 'min' else -float('inf')
+        
 
     
     def _create_optimizer(self):
@@ -183,27 +214,43 @@ class SupervisedTrainer:
             # 根据配置的打印间隔输出训练信息
             print_interval = self.config.get('print_interval', 10)
             
-            # 早停检查和checkpoint保存
+            # 早停检查按 val_loss
             improvement = None
             if val_loss < self.best_val_loss:
                 improvement = self.best_val_loss - val_loss
                 self.best_val_loss = val_loss
                 self.patience_counter = 0
-                
-                # 保存checkpoint（当val_loss改善时）
-                if self.result_manager and self.experiment_name:
-                    logging_level = self.config.get('logging_level', 'normal')
-                    ckpt_path = self.result_manager.save_checkpoint(
-                        self.experiment_name, self.model, self.optimizer, 
-                        epoch + 1, val_loss,  # epoch+1因为从0开始计数
-                        logging_level=logging_level
-                    )
-                    try:
-                        self.best_checkpoint_path = ckpt_path
-                    except Exception:
-                        self.best_checkpoint_path = None
             else:
                 self.patience_counter += 1
+
+            # 计算监控值并按策略保存checkpoint
+            monitor_value = self._compute_monitor_value(val_loss)
+            save_now = False
+            if self.checkpoint_policy == 'best':
+                better = (monitor_value < self.best_monitor_value) if self.monitor_mode == 'min' else (monitor_value > self.best_monitor_value)
+                if better:
+                    self.best_monitor_value = monitor_value
+                    save_now = True
+            elif self.checkpoint_policy == 'all':
+                save_now = True
+            
+            if save_now and self.result_manager and self.experiment_name:
+                ckpt_path = self.result_manager.save_checkpoint(
+                    self.experiment_name, self.model, self.optimizer, 
+                    epoch + 1, val_loss  # 文件名仍包含验证损失
+                )
+                try:
+                    # 维护 best.pth 以便最终评估快速加载
+                    if self.checkpoint_policy == 'best':
+                        best_path = ckpt_path.parent / 'best.pth'
+                        shutil.copy2(ckpt_path, best_path)
+                        self.best_checkpoint_path = best_path
+                    else:
+                        # all 策略：仍记录首次生成的best引用
+                        if self.best_checkpoint_path is None:
+                            self.best_checkpoint_path = ckpt_path
+                except Exception:
+                    pass
             
             # 打印epoch信息（使用模块化系统）
             if epoch % print_interval == 0 or epoch == epochs - 1:
@@ -267,6 +314,51 @@ class SupervisedTrainer:
         
 
         return results
+
+    def _compute_monitor_value(self, current_val_loss: float) -> float:
+        """根据 monitor 配置计算当前监控值。"""
+        # 特例：支持显式指定 'val_loss' 作为监控指标名
+        if self.monitor_metric == 'val_loss':
+            return float(current_val_loss)
+
+        # 选择 split 数据
+        if self.monitor_split == 'val':
+            X_t = self.X_val
+            y_t = self.y_val
+        else:
+            X_t = self.X_test
+            y_t = self.y_test
+
+        # 预测
+        y_t_pred = self.predict(X_t)
+        y_t_np = y_t.cpu().numpy() if hasattr(y_t, 'cpu') else y_t
+
+        # 通过 eval_loader 仅计算单一指标
+        try:
+            eval_templates = (self.full_config.get('evaluation_templates') or {})
+            tpl = eval_templates[self.epochinfo_template]
+            if isinstance(tpl, dict) and 'metrics' not in tpl:
+                metric_map = {k: v for k, v in tpl.items() if not str(k).startswith('_')}
+            else:
+                metric_map = tpl.get('metrics', {})
+            metric_cfg = metric_map[self.monitor_metric]
+
+            if not self.eval_loader:
+                from src.eval_loader import EvalLoader
+                self.eval_loader = EvalLoader()
+            evaluator_func = self.eval_loader._load_evaluator(self.monitor_metric, metric_cfg)
+
+            # 仅使用测试通道传入监控 split；训练通道传入空占位
+            X_train_np = np.empty((0,))
+            y_train_np = np.empty((0,))
+            y_train_pred_np = np.empty((0,))
+            value = evaluator_func(
+                X_train_np, y_train_np, y_train_pred_np,
+                None, y_t_np, y_t_pred
+            )
+            return float(value)
+        except Exception as e:
+            raise ValueError(f"计算 monitor 指标失败: metric={self.monitor_metric}, split={self.monitor_split}, 错误: {e}")
     
     def _train_epoch(self) -> float:
         """训练一个epoch"""

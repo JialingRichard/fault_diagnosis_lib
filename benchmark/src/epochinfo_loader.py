@@ -41,29 +41,15 @@ class EpochInfoLoader:
             epochinfo_template_name: epoch信息模板名称
             epoch_data: epoch数据，包含所有需要的信息
         """
-        epochinfo_template = config.get('epochinfo_templates', {}).get(epochinfo_template_name, {})
-        
-        if not epochinfo_template:
-            logger.warning(f"Epoch信息模板 '{epochinfo_template_name}' 未找到，使用默认打印")
-            self._default_print(epoch_data)
-            return
-        
-        # 支持不同的配置模式
-        if 'format' in epochinfo_template:
-            # 单个打印函数模式
-            format_config = epochinfo_template['format']
-            if format_config == 'default':
-                self._default_print(epoch_data)
-            else:
-                print_func = self._load_print_function(format_config)
-                if print_func:
-                    print_func(epoch_data, epochinfo_template)
-                else:
-                    self._default_print(epoch_data)
-        elif 'evaluation' in epochinfo_template:
-            # 基本信息 + 评估指标模式
-            self._print_with_evaluation(epoch_data, epochinfo_template, config)
+        # 新逻辑：epochinfo 直接引用 evaluation_templates 的模板名
+        eval_templates = config.get('evaluation_templates', {})
+        if epochinfo_template_name and epochinfo_template_name in eval_templates:
+            # 基本信息 + 评估指标
+            self._print_with_evaluation(epoch_data, epochinfo_template_name, config)
         else:
+            # 未指定或模板不存在，打印基本信息
+            if epochinfo_template_name:
+                logger.warning(f"Epoch信息模板 '{epochinfo_template_name}' 未找到，使用默认打印")
             self._default_print(epoch_data)
     
     def _load_print_function(self, format_config: Dict[str, str]) -> Callable:
@@ -149,7 +135,7 @@ class EpochInfoLoader:
         else:
             print(f"   E{epoch+1:3d}/{total_epochs}: {train_loss:.4f}→{val_loss:.4f} ×{patience_counter}/{patience}")
     
-    def _print_with_evaluation(self, epoch_data: Dict[str, Any], epochinfo_template: Dict[str, Any], config: Dict[str, Any]) -> None:
+    def _print_with_evaluation(self, epoch_data: Dict[str, Any], eval_template_name: str, config: Dict[str, Any]) -> None:
         """
         打印基本epoch信息 + 评估指标
         
@@ -174,7 +160,7 @@ class EpochInfoLoader:
         
         # 如果有eval_loader且配置了evaluation，计算评估指标
         metrics_str = ""
-        if self.eval_loader and 'evaluation' in epochinfo_template:
+        if self.eval_loader and eval_template_name:
             trainer = epoch_data.get('trainer')
             if trainer:
                 try:
@@ -194,18 +180,13 @@ class EpochInfoLoader:
                     if hasattr(y_test, 'cpu'):
                         y_test = y_test.cpu().numpy()
                     
-                    # 调用评估器计算指标（静默模式）
-                    eval_template_name = epochinfo_template['evaluation']
-                    
-                    # 为评估器设置上下文（plots目录、epoch信息、日志等级）
+                    # 为评估器设置上下文（plots目录、epoch信息）
                     if hasattr(trainer, 'result_manager') and trainer.result_manager:
                         plots_dir = trainer.result_manager.get_experiment_plot_dir(trainer.experiment_name)
-                        logging_level = trainer.config.get('logging_level', 'normal')
                         # 设置epoch上下文，图像会保存到epochinfo子目录
                         self.eval_loader.set_context(
                             plots_dir=plots_dir,
-                            epoch_info=epoch_data,  # 传递epoch信息，图像会保存到epochinfo/子目录
-                            logging_level=logging_level
+                            epoch_info=epoch_data  # 传递epoch信息，图像会保存到epochinfo/子目录
                         )
                     
                     # 临时禁用日志

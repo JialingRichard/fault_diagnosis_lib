@@ -91,8 +91,8 @@ class ModelLoader:
         model = model_class(input_dim=input_dim, **filtered_config)
         
         # 设置设备 - 严格按配置执行
-        device = config.get('device')
+        # 设备从全局配置读取
+        device = (config.get('global') or {}).get('device', config.get('device', 'cpu'))
         model = model.to(device)
         logger.info(f"模型 '{model_name}' 加载到设备: {device}")
         return model
-

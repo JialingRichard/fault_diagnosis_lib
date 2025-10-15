@@ -1,3 +1,8 @@
+# 全局设置
+global:
+  seed: 42           # 全局随机种子（Python/NumPy/PyTorch）
+  deterministic: false  # 设为 true 可获得更强确定性（可能降低性能）
+
 # 全局设备设置
 device: 'cuda'
 # 实验配置信息
