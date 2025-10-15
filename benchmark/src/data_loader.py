@@ -142,10 +142,10 @@ class DataLoader:
                         features_after = X_train_processed.shape[-1]
 
                         # Construct detailed log information
-                        param_str = ", ".join([f"{k}={v}" for k, v in step_params.items()]) if step_params else "无参数"
+                        param_str = ", ".join([f"{k}={v}" for k, v in step_params.items()]) if step_params else "No parameters"
                         feature_change = f"{features_before}→{features_after}" if features_before != features_after else f"{features_before}"
-                        
-                        logger.info(f"✓ {step_name}: {file_name}.{function_name}({param_str}) | 特征数: {feature_change}")
+
+                        logger.info(f"✓ {step_name}: {file_name}.{function_name}({param_str}) | Feature count: {feature_change}")
             else:
                 # Simplified format support
                 if self._is_simple_config(step_name, step_config):
