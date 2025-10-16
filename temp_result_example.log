@@ -1,0 +1,266 @@
+Results will be saved to: /home/chen/dev/fault_diagnosis_lib/benchmark/results/ExampleComplex/v3_20251016_123357
+================================================================================
+Fault Diagnosis Benchmark Framework - 故障诊断基准测试
+================================================================================
+Config File: configs/ExampleComplex.yaml
+Work Root Dir: /home/chen/dev/fault_diagnosis_lib/benchmark
+
+Step 1: Load experiment configuration
+2025-10-16 12:33:57 - src.config_loader - INFO - Config loaded: configs/ExampleComplex.yaml
+2025-10-16 12:33:57 - src.config_loader - INFO - Config validated
+Global seed: 42 | Deterministic: False
+Global Configuration:
+  device: cuda | seed: 42 | deterministic: False | ckpt_policy: best
+  author: Benchmark | version: 3.0 | date: 2025-10-16
+
+Found dataset collection 'UCR_subset': 4 sub-datasets
+   ElectricDevices, Crop, FordB, FordA
+Found dataset collection 'UCR_subset': 4 sub-datasets
+   ElectricDevices, Crop, FordB, FordA
+Found dataset collection 'UCR_subset': 4 sub-datasets
+   ElectricDevices, Crop, FordB, FordA
+Found grid search parameters: 5
+   models.LSTM.hidden_dim: 2 values [64, 128]
+   models.LSTM.num_layers: 2 values [2, 3]
+   models.CNN.filter_sizes: 3 values [[3, 5, 7], [3, 5], [3]]
+   models.CNN.num_layers: 3 values [3, 2, 1]
+   models.PatchTST.patch_len: 3 values [4, 16, 64]
+A total of 80 experiment configurations will be generated
+   Found 80 experiment configurations
+   1. LSTM_NPY_UCI_HAR_grid_hidden_dim_64_num_layers_2 (LSTM on NPY_UCI_HAR)
+   2. LSTM_NPY_UCI_HAR_grid_hidden_dim_64_num_layers_3 (LSTM on NPY_UCI_HAR)
+   3. LSTM_NPY_UCI_HAR_grid_hidden_dim_128_num_layers_2 (LSTM on NPY_UCI_HAR)
+   4. LSTM_NPY_UCI_HAR_grid_hidden_dim_128_num_layers_3 (LSTM on NPY_UCI_HAR)
+   5. CNN_NPY_UCI_HAR_grid_filter_sizes_3_5_7_num_layers_3 (CNN on NPY_UCI_HAR)
+   6. CNN_NPY_UCI_HAR_grid_filter_sizes_3_5_7_num_layers_2 (CNN on NPY_UCI_HAR)
+   7. CNN_NPY_UCI_HAR_grid_filter_sizes_3_5_7_num_layers_1 (CNN on NPY_UCI_HAR)
+   8. CNN_NPY_UCI_HAR_grid_filter_sizes_3_5_num_layers_3 (CNN on NPY_UCI_HAR)
+   9. CNN_NPY_UCI_HAR_grid_filter_sizes_3_5_num_layers_2 (CNN on NPY_UCI_HAR)
+   10. CNN_NPY_UCI_HAR_grid_filter_sizes_3_5_num_layers_1 (CNN on NPY_UCI_HAR)
+   11. CNN_NPY_UCI_HAR_grid_filter_sizes_3_num_layers_3 (CNN on NPY_UCI_HAR)
+   12. CNN_NPY_UCI_HAR_grid_filter_sizes_3_num_layers_2 (CNN on NPY_UCI_HAR)
+   13. CNN_NPY_UCI_HAR_grid_filter_sizes_3_num_layers_1 (CNN on NPY_UCI_HAR)
+   14. PatchTST_NPY_UCI_HAR_grid_patch_len_4 (PatchTST on NPY_UCI_HAR)
+   15. PatchTST_NPY_UCI_HAR_grid_patch_len_16 (PatchTST on NPY_UCI_HAR)
+   16. PatchTST_NPY_UCI_HAR_grid_patch_len_64 (PatchTST on NPY_UCI_HAR)
+   17. LSTM_UCR2018_ElectricDevices_grid_hidden_dim_64_num_layers_2 (LSTM on UCR_subset_ElectricDevices)
+   18. LSTM_UCR2018_ElectricDevices_grid_hidden_dim_64_num_layers_3 (LSTM on UCR_subset_ElectricDevices)
+   19. LSTM_UCR2018_ElectricDevices_grid_hidden_dim_128_num_layers_2 (LSTM on UCR_subset_ElectricDevices)
+   20. LSTM_UCR2018_ElectricDevices_grid_hidden_dim_128_num_layers_3 (LSTM on UCR_subset_ElectricDevices)
+   21. LSTM_UCR2018_Crop_grid_hidden_dim_64_num_layers_2 (LSTM on UCR_subset_Crop)
+   22. LSTM_UCR2018_Crop_grid_hidden_dim_64_num_layers_3 (LSTM on UCR_subset_Crop)
+   23. LSTM_UCR2018_Crop_grid_hidden_dim_128_num_layers_2 (LSTM on UCR_subset_Crop)
+   24. LSTM_UCR2018_Crop_grid_hidden_dim_128_num_layers_3 (LSTM on UCR_subset_Crop)
+   25. LSTM_UCR2018_FordB_grid_hidden_dim_64_num_layers_2 (LSTM on UCR_subset_FordB)
+   26. LSTM_UCR2018_FordB_grid_hidden_dim_64_num_layers_3 (LSTM on UCR_subset_FordB)
+   27. LSTM_UCR2018_FordB_grid_hidden_dim_128_num_layers_2 (LSTM on UCR_subset_FordB)
+   28. LSTM_UCR2018_FordB_grid_hidden_dim_128_num_layers_3 (LSTM on UCR_subset_FordB)
+   29. LSTM_UCR2018_FordA_grid_hidden_dim_64_num_layers_2 (LSTM on UCR_subset_FordA)
+   30. LSTM_UCR2018_FordA_grid_hidden_dim_64_num_layers_3 (LSTM on UCR_subset_FordA)
+   31. LSTM_UCR2018_FordA_grid_hidden_dim_128_num_layers_2 (LSTM on UCR_subset_FordA)
+   32. LSTM_UCR2018_FordA_grid_hidden_dim_128_num_layers_3 (LSTM on UCR_subset_FordA)
+   33. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_5_7_num_layers_3 (CNN on UCR_subset_ElectricDevices)
+   34. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_5_7_num_layers_2 (CNN on UCR_subset_ElectricDevices)
+   35. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_5_7_num_layers_1 (CNN on UCR_subset_ElectricDevices)
+   36. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_5_num_layers_3 (CNN on UCR_subset_ElectricDevices)
+   37. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_5_num_layers_2 (CNN on UCR_subset_ElectricDevices)
+   38. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_5_num_layers_1 (CNN on UCR_subset_ElectricDevices)
+   39. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_num_layers_3 (CNN on UCR_subset_ElectricDevices)
+   40. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_num_layers_2 (CNN on UCR_subset_ElectricDevices)
+   41. CNN_UCR2018_ElectricDevices_grid_filter_sizes_3_num_layers_1 (CNN on UCR_subset_ElectricDevices)
+   42. CNN_UCR2018_Crop_grid_filter_sizes_3_5_7_num_layers_3 (CNN on UCR_subset_Crop)
+   43. CNN_UCR2018_Crop_grid_filter_sizes_3_5_7_num_layers_2 (CNN on UCR_subset_Crop)
+   44. CNN_UCR2018_Crop_grid_filter_sizes_3_5_7_num_layers_1 (CNN on UCR_subset_Crop)
+   45. CNN_UCR2018_Crop_grid_filter_sizes_3_5_num_layers_3 (CNN on UCR_subset_Crop)
+   46. CNN_UCR2018_Crop_grid_filter_sizes_3_5_num_layers_2 (CNN on UCR_subset_Crop)
+   47. CNN_UCR2018_Crop_grid_filter_sizes_3_5_num_layers_1 (CNN on UCR_subset_Crop)
+   48. CNN_UCR2018_Crop_grid_filter_sizes_3_num_layers_3 (CNN on UCR_subset_Crop)
+   49. CNN_UCR2018_Crop_grid_filter_sizes_3_num_layers_2 (CNN on UCR_subset_Crop)
+   50. CNN_UCR2018_Crop_grid_filter_sizes_3_num_layers_1 (CNN on UCR_subset_Crop)
+   51. CNN_UCR2018_FordB_grid_filter_sizes_3_5_7_num_layers_3 (CNN on UCR_subset_FordB)
+   52. CNN_UCR2018_FordB_grid_filter_sizes_3_5_7_num_layers_2 (CNN on UCR_subset_FordB)
+   53. CNN_UCR2018_FordB_grid_filter_sizes_3_5_7_num_layers_1 (CNN on UCR_subset_FordB)
+   54. CNN_UCR2018_FordB_grid_filter_sizes_3_5_num_layers_3 (CNN on UCR_subset_FordB)
+   55. CNN_UCR2018_FordB_grid_filter_sizes_3_5_num_layers_2 (CNN on UCR_subset_FordB)
+   56. CNN_UCR2018_FordB_grid_filter_sizes_3_5_num_layers_1 (CNN on UCR_subset_FordB)
+   57. CNN_UCR2018_FordB_grid_filter_sizes_3_num_layers_3 (CNN on UCR_subset_FordB)
+   58. CNN_UCR2018_FordB_grid_filter_sizes_3_num_layers_2 (CNN on UCR_subset_FordB)
+   59. CNN_UCR2018_FordB_grid_filter_sizes_3_num_layers_1 (CNN on UCR_subset_FordB)
+   60. CNN_UCR2018_FordA_grid_filter_sizes_3_5_7_num_layers_3 (CNN on UCR_subset_FordA)
+   61. CNN_UCR2018_FordA_grid_filter_sizes_3_5_7_num_layers_2 (CNN on UCR_subset_FordA)
+   62. CNN_UCR2018_FordA_grid_filter_sizes_3_5_7_num_layers_1 (CNN on UCR_subset_FordA)
+   63. CNN_UCR2018_FordA_grid_filter_sizes_3_5_num_layers_3 (CNN on UCR_subset_FordA)
+   64. CNN_UCR2018_FordA_grid_filter_sizes_3_5_num_layers_2 (CNN on UCR_subset_FordA)
+   65. CNN_UCR2018_FordA_grid_filter_sizes_3_5_num_layers_1 (CNN on UCR_subset_FordA)
+   66. CNN_UCR2018_FordA_grid_filter_sizes_3_num_layers_3 (CNN on UCR_subset_FordA)
+   67. CNN_UCR2018_FordA_grid_filter_sizes_3_num_layers_2 (CNN on UCR_subset_FordA)
+   68. CNN_UCR2018_FordA_grid_filter_sizes_3_num_layers_1 (CNN on UCR_subset_FordA)
+   69. PatchTST_UCR2018_ElectricDevices_grid_patch_len_4 (PatchTST on UCR_subset_ElectricDevices)
+   70. PatchTST_UCR2018_ElectricDevices_grid_patch_len_16 (PatchTST on UCR_subset_ElectricDevices)
+   71. PatchTST_UCR2018_ElectricDevices_grid_patch_len_64 (PatchTST on UCR_subset_ElectricDevices)
+   72. PatchTST_UCR2018_Crop_grid_patch_len_4 (PatchTST on UCR_subset_Crop)
+   73. PatchTST_UCR2018_Crop_grid_patch_len_16 (PatchTST on UCR_subset_Crop)
+   74. PatchTST_UCR2018_Crop_grid_patch_len_64 (PatchTST on UCR_subset_Crop)
+   75. PatchTST_UCR2018_FordB_grid_patch_len_4 (PatchTST on UCR_subset_FordB)
+   76. PatchTST_UCR2018_FordB_grid_patch_len_16 (PatchTST on UCR_subset_FordB)
+   77. PatchTST_UCR2018_FordB_grid_patch_len_64 (PatchTST on UCR_subset_FordB)
+   78. PatchTST_UCR2018_FordA_grid_patch_len_4 (PatchTST on UCR_subset_FordA)
+   79. PatchTST_UCR2018_FordA_grid_patch_len_16 (PatchTST on UCR_subset_FordA)
+   80. PatchTST_UCR2018_FordA_grid_patch_len_64 (PatchTST on UCR_subset_FordA)
+
+Step 2: Initialize system components
+All components are ready
+
+
+==================== Experiment 1/80: LSTM_NPY_UCI_HAR_grid_hidden_dim_64_num_layers_2 ====================
+Model:LSTM | Data:NPY_UCI_HAR | Train:supervised_debug_with_metrics | Epoch:train_acc  | Monitor:accuracy-max-val | Eval:default
+--------------------------------------------------------------------------------
+Experiment start time: 2025-10-16 12:34:00
+2025-10-16 12:34:00 - src.data_loader - INFO - Starting data loading and preprocessing...
+2025-10-16 12:34:00 - src.data_loader - INFO - Loading pre-split dataset...
+2025-10-16 12:34:00 - src.data_loader - INFO - Data loader has provided pre-split data.
+2025-10-16 12:34:00 - src.data_loader - INFO - Starting preprocessing | Original data: train(7352, 128, 9), test(2947, 128, 9)
+2025-10-16 12:34:00 - src.data_loader - INFO - ✓ normalize: normalizers.standard_normalize(No parameters) | Feature count: 9
+2025-10-16 12:34:00 - src.data_loader - INFO - ✓ add_noise: noise_processors.add_gaussian_noise(noise_level=0.01) | Feature count: 9
+2025-10-16 12:34:00 - src.data_loader - INFO - ✓ remove_outliers: noise_processors.remove_outliers(threshold=3.0) | Feature count: 9
+2025-10-16 12:34:01 - src.data_loader - INFO - ✓ feature_engineering: feature_engineering.add_statistical_features(No parameters) | Feature count: 9
+2025-10-16 12:34:01 - src.data_loader - INFO - Preprocessing completed | Final data: train(7352, 132, 9), test(2947, 132, 9)
+2025-10-16 12:34:01 - src.data_loader - INFO - Modular preprocessing completed.
+2025-10-16 12:34:01 - src.data_loader - INFO - Data preparation completed.
+Data: 7,352 train + 2,947 test | Features: 9 | Classes: 6
+2025-10-16 12:34:01 - src.model_loader - INFO - Model 'LSTM' moved to device: cuda
+Model: 52,870 parameters
+Starting training...
+   Using stratified split for validation set
+   Split: 5,881 train + 1,471 val + 2,947 test
+   50 epochs (patience:2)
+2025-10-16 12:34:04 - src.eval_loader - INFO - Evaluator 'accuracy' loaded (module: sklearn_metrics, function: accuracy_evaluate)
+   E  1/50: 1.2394→0.6684 ↓inf | accuracy=0.754 | split:val
+   E  2/50: 0.4592→0.3354 ↓0.3330 | accuracy=0.868 | split:val
+   E  3/50: 0.2771→0.2108 ↓0.1245 | accuracy=0.938 | split:val
+   E  4/50: 0.2502->0.3829 x0/2 | accuracy=0.876 | split:val
+   E  5/50: 0.2040→0.1440 ↓0.0668 | accuracy=0.954 | split:val
+   E  6/50: 0.1896->0.1521 x0/2 | accuracy=0.950 | split:val
+   E  7/50: 0.1693→0.1398 ↓0.0042 | accuracy=0.954 | split:val
+   E  8/50: 0.1398→0.1192 ↓0.0206 | accuracy=0.959 | split:val
+   E  9/50: 0.1364->0.1265 x0/2 | accuracy=0.948 | split:val
+   E 10/50: 0.1216→0.1052 ↓0.0139 | accuracy=0.963 | split:val
+   E 11/50: 0.1145->0.1209 x0/2 | accuracy=0.956 | split:val
+   E 12/50: 0.1570->0.1169 x0/2 | accuracy=0.954 | split:val
+   E 13/50: 0.1154->0.1086 x0/2 | accuracy=0.959 | split:val
+   E 14/50: 0.1096→0.0988 ↓0.0064 | accuracy=0.961 | split:val
+   E 15/50: 0.1098->0.1126 x0/2 | accuracy=0.962 | split:val
+   E 16/50: 0.1262->0.1190 x0/2 | accuracy=0.965 | split:val
+   E 17/50: 0.1144->0.1129 x0/2 | accuracy=0.956 | split:val
+   E 18/50: 0.1052→0.0973 ↓0.0015 | accuracy=0.965 | split:val
+   E 19/50: 0.1077->0.1034 x0/2 | accuracy=0.958 | split:val
+   E 20/50: 0.1110->0.1089 x0/2 | accuracy=0.954 | split:val
+   E 21/50: 0.1084->0.1157 x0/2 | accuracy=0.964 | split:val
+   E 22/50: 0.1163->0.1536 x0/2 | accuracy=0.929 | split:val
+   E 23/50: 0.1234->0.1019 x0/2 | accuracy=0.953 | split:val
+   E 24/50: 0.3499->0.3037 x0/2 | accuracy=0.869 | split:val
+   E 25/50: 0.2189->0.1245 x0/2 | accuracy=0.960 | split:val
+   E 26/50: 0.1380->0.1135 x0/2 | accuracy=0.960 | split:val
+   E 27/50: 0.1207->0.1059 x0/2 | accuracy=0.961 | split:val
+   E 28/50: 0.1323->0.1226 x0/2 | accuracy=0.953 | split:val
+   E 29/50: 0.1113->0.0982 x0/2 | accuracy=0.964 | split:val
+   E 30/50: 0.1294->0.1079 x0/2 | accuracy=0.956 | split:val
+   E 31/50: 0.1059→0.0955 ↓0.0018 | accuracy=0.962 | split:val
+   E 32/50: 0.1082->0.1103 x0/2 | accuracy=0.958 | split:val
+   E 33/50: 0.1845->0.1240 x0/2 | accuracy=0.956 | split:val
+   E 34/50: 0.1823->0.1116 x0/2 | accuracy=0.956 | split:val
+   E 35/50: 0.1229->0.1092 x0/2 | accuracy=0.954 | split:val
+   E 36/50: 0.1081->0.1056 x0/2 | accuracy=0.952 | split:val
+   E 37/50: 0.1071->0.1131 x0/2 | accuracy=0.960 | split:val
+   E 38/50: 0.1157->0.1064 x0/2 | accuracy=0.961 | split:val
+   E 39/50: 0.1032→0.0905 ↓0.0050 | accuracy=0.967 | split:val
+   E 40/50: 0.1108->0.1100 x0/2 | accuracy=0.954 | split:val
+   E 41/50: 0.0993->0.1164 x0/2 | accuracy=0.961 | split:val
+   E 42/50: 0.1148->0.1048 x0/2 | accuracy=0.965 | split:val
+   E 43/50: 0.1039->0.0947 x0/2 | accuracy=0.968 | split:val
+   E 44/50: 0.0992->0.0914 x0/2 | accuracy=0.966 | split:val
+   E 45/50: 0.1005->0.0919 x0/2 | accuracy=0.964 | split:val
+   E 46/50: 0.0961->0.0911 x0/2 | accuracy=0.967 | split:val
+   E 47/50: 0.1025->0.1252 x0/2 | accuracy=0.954 | split:val
+   E 48/50: 0.1208->0.1705 x0/2 | accuracy=0.950 | split:val
+   E 49/50: 0.1250->0.1063 x0/2 | accuracy=0.960 | split:val
+   E 50/50: 0.2233->0.2482 x0/2 | accuracy=0.929 | split:val
+Starting evaluation...
+Using best checkpoint for final evaluation: /home/chen/dev/fault_diagnosis_lib/benchmark/results/ExampleComplex/v3_20251016_123357/LSTM_NPY_UCI_HAR_grid_hidden_dim_64_num_layers_2/checkpoints/best.pth
+2025-10-16 12:35:28 - src.eval_loader - INFO - Evaluator 'f1' loaded (module: f1, function: evaluate)
+2025-10-16 12:35:28 - src.eval_loader - INFO - Metric 'f1': 0.8779
+2025-10-16 12:35:28 - src.eval_loader - INFO - Evaluator 'precision' loaded (module: sklearn_metrics, function: precision_evaluate)
+2025-10-16 12:35:28 - src.eval_loader - INFO - Metric 'precision': 0.8818
+2025-10-16 12:35:28 - src.eval_loader - INFO - Evaluator 'recall' loaded (module: sklearn_metrics, function: recall_evaluate)
+2025-10-16 12:35:28 - src.eval_loader - INFO - Metric 'recall': 0.8765
+2025-10-16 12:35:28 - src.eval_loader - INFO - Metric 'accuracy': 0.8768
+2025-10-16 12:35:28 - src.eval_loader - INFO - Evaluator 'train_test_gap' loaded (module: sklearn_metrics, function: train_test_gap_evaluate)
+2025-10-16 12:35:28 - src.eval_loader - INFO - Metric 'train_test_gap': 0.0554
+2025-10-16 12:35:28 - src.eval_loader - INFO - Evaluator 'test_samples' loaded (module: plot_label_distribution, function: evaluate)
+2025-10-16 12:35:28 - src.eval_loader - INFO - Figure saved: /home/chen/dev/fault_diagnosis_lib/benchmark/results/ExampleComplex/v3_20251016_123357/LSTM_NPY_UCI_HAR_grid_hidden_dim_64_num_layers_2/plots/test_samples.png
+2025-10-16 12:35:28 - src.eval_loader - INFO - Metric 'test_samples': 2947.0000
+Training complete: 50 epochs | Validation loss: 0.2482
+Evaluation results: f1=0.8779 precision=0.8818 recall=0.8765 accuracy=0.8768 train_test_gap=0.0554 test_samples=2947.0000 
+Experiment end time: 2025-10-16 12:35:28 | Duration: 88.6s
+Experiment complete
+
+
+
+==================== Experiment 2/80: LSTM_NPY_UCI_HAR_grid_hidden_dim_64_num_layers_3 ====================
+Model:LSTM | Data:NPY_UCI_HAR | Train:supervised_debug_with_metrics | Epoch:train_acc  | Monitor:accuracy-max-val | Eval:default
+--------------------------------------------------------------------------------
+Experiment start time: 2025-10-16 12:35:28
+2025-10-16 12:35:28 - src.data_loader - INFO - Starting data loading and preprocessing...
+2025-10-16 12:35:28 - src.data_loader - INFO - Loading pre-split dataset...
+2025-10-16 12:35:28 - src.data_loader - INFO - Data loader has provided pre-split data.
+2025-10-16 12:35:28 - src.data_loader - INFO - Starting preprocessing | Original data: train(7352, 128, 9), test(2947, 128, 9)
+2025-10-16 12:35:28 - src.data_loader - INFO - ✓ normalize: normalizers.standard_normalize(No parameters) | Feature count: 9
+2025-10-16 12:35:29 - src.data_loader - INFO - ✓ add_noise: noise_processors.add_gaussian_noise(noise_level=0.01) | Feature count: 9
+2025-10-16 12:35:29 - src.data_loader - INFO - ✓ remove_outliers: noise_processors.remove_outliers(threshold=3.0) | Feature count: 9
+2025-10-16 12:35:30 - src.data_loader - INFO - ✓ feature_engineering: feature_engineering.add_statistical_features(No parameters) | Feature count: 9
+2025-10-16 12:35:30 - src.data_loader - INFO - Preprocessing completed | Final data: train(7352, 132, 9), test(2947, 132, 9)
+2025-10-16 12:35:30 - src.data_loader - INFO - Modular preprocessing completed.
+2025-10-16 12:35:30 - src.data_loader - INFO - Data preparation completed.
+Data: 7,352 train + 2,947 test | Features: 9 | Classes: 6
+2025-10-16 12:35:30 - src.model_loader - INFO - Model 'LSTM' moved to device: cuda
+Model: 86,150 parameters
+Starting training...
+   Using stratified split for validation set
+   Split: 5,881 train + 1,471 val + 2,947 test
+   50 epochs (patience:2)
+   E  1/50: 1.2028→0.6942 ↓inf | accuracy=0.655 | split:val
+   E  2/50: 0.6797→0.6535 ↓0.0406 | accuracy=0.721 | split:val
+   E  3/50: 0.5503→0.3745 ↓0.2791 | accuracy=0.878 | split:val
+   E  4/50: 0.2676→0.1957 ↓0.1788 | accuracy=0.939 | split:val
+   E  5/50: 0.2379→0.1399 ↓0.0558 | accuracy=0.951 | split:val
+   E  6/50: 0.1575->0.1466 x0/2 | accuracy=0.950 | split:val
+   E  7/50: 0.1323→0.1332 ↓0.0067 | accuracy=0.959 | split:val
+   E  8/50: 0.1457->0.1426 x0/2 | accuracy=0.943 | split:val
+   E  9/50: 0.1358→0.1147 ↓0.0185 | accuracy=0.949 | split:val
+   E 10/50: 0.1225->0.1164 x0/2 | accuracy=0.959 | split:val
+   E 11/50: 0.1310->0.1383 x0/2 | accuracy=0.950 | split:val
+   E 12/50: 0.1374->0.1652 x0/2 | accuracy=0.934 | split:val
+   E 13/50: 0.1624->0.1278 x0/2 | accuracy=0.948 | split:val
+   E 14/50: 0.1219→0.1033 ↓0.0114 | accuracy=0.964 | split:val
+   E 15/50: 0.1279->0.1547 x0/2 | accuracy=0.949 | split:val
+   E 16/50: 0.1498→0.0969 ↓0.0065 | accuracy=0.964 | split:val
+   E 17/50: 0.1104->0.0997 x0/2 | accuracy=0.959 | split:val
+   E 18/50: 0.1263->0.1188 x0/2 | accuracy=0.946 | split:val
+   E 19/50: 0.1938->0.2657 x0/2 | accuracy=0.859 | split:val
+   E 20/50: 0.1657->0.1142 x0/2 | accuracy=0.950 | split:val
+   E 21/50: 0.1234->0.1062 x0/2 | accuracy=0.954 | split:val
+   E 22/50: 0.1147->0.1108 x0/2 | accuracy=0.956 | split:val
+   E 23/50: 0.1104->0.0984 x0/2 | accuracy=0.965 | split:val
+   E 24/50: 0.1072→0.0963 ↓0.0006 | accuracy=0.964 | split:val
+   E 25/50: 0.1050->0.1044 x0/2 | accuracy=0.959 | split:val
+   E 26/50: 0.1118->0.1139 x0/2 | accuracy=0.951 | split:val
+   E 27/50: 0.1056→0.0960 ↓0.0003 | accuracy=0.963 | split:val
+   E 28/50: 0.1011->0.1165 x0/2 | accuracy=0.949 | split:val
+   E 29/50: 0.1165->0.1165 x0/2 | accuracy=0.959 | split:val
+   E 30/50: 0.1122->0.1043 x0/2 | accuracy=0.958 | split:val
+   E 31/50: 0.1036->0.1065 x0/2 | accuracy=0.951 | split:val
+   E 32/50: 0.1090->0.1038 x0/2 | accuracy=0.950 | split:val
+   E 33/50: 0.1028→0.0901 ↓0.0059 | accuracy=0.963 | split:val
+   E 34/50: 0.1003->0.0926 x0/2 | accuracy=0.964 | split:val
+   E 35/50: 0.0984→0.0858 ↓0.0043 | accuracy=0.964 | split:val
+   E 36/50: 0.1369->0.1140 x0/2 | accuracy=0.956 | split:val
