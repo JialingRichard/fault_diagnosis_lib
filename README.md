@@ -8,23 +8,27 @@ This README introduces the framework and provides a hands-on tutorial using `ben
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Configuration Walkthrough](#configuration-walkthrough)
-   - [Global](#global)
-   - [Datasets](#datasets)
-   - [Models](#models)
-   - [Experiments](#experiments)
-   - [Training Templates](#training-templates)
-   - [Evaluation Templates](#evaluation-templates)
-3. [Running Experiments](#running-experiments)
-4. [Interpreting Outputs](#interpreting-outputs)
-5. [Extending the Framework](#extending-the-framework)
-   - [Datasets](#extending-datasets)
-   - [Preprocessors](#extending-preprocessors)
-   - [Models](#extending-models)
-   - [Trainers](#extending-trainers)
-   - [Evaluators](#extending-evaluators)
-6. [Project Layout](#project-layout)
+- [Fault Diagnosis Benchmark Framework](#fault-diagnosis-benchmark-framework)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+  - [Key Flexibility Highlights](#key-flexibility-highlights)
+  - [TODO](#todo)
+  - [Configuration Walkthrough](#configuration-walkthrough)
+    - [Global](#global)
+    - [Datasets](#datasets)
+    - [Models](#models)
+    - [Experiments](#experiments)
+    - [Training Templates](#training-templates)
+    - [Evaluation Templates](#evaluation-templates)
+  - [Running Experiments](#running-experiments)
+  - [Interpreting Outputs](#interpreting-outputs)
+  - [Extending the Framework](#extending-the-framework)
+    - [Extending Datasets](#extending-datasets)
+    - [Extending Preprocessors](#extending-preprocessors)
+    - [Extending Models](#extending-models)
+    - [Extending Trainers](#extending-trainers)
+    - [Extending Evaluators](#extending-evaluators)
+  - [Project Layout](#project-layout)
 
 ---
 
@@ -40,6 +44,28 @@ python main.py configs/ExampleComplex.yaml
 ```
 
 The command above runs every experiment defined in `ExampleComplex.yaml`, writes logs to `benchmark/results/<config_name>/v*/`, and produces summaries plus Excel exports.
+
+---
+
+## Key Flexibility Highlights
+
+- **Grid search & summarization control** – specify candidate values in model configs, then decide whether to keep all results or only the best per (model, dataset) group using per-experiment `summary` settings.
+- **Customizable early stopping** – toggle `early_stop_use_monitor` to stop by validation loss or by your own monitor metric/split.
+- **Best checkpoint selection** – `monitor` determines the metric/split used to track and save `best.pth`, so “best” matches your KPI.
+- **Data fraction for rapid iteration** – set `data_fraction` to 0.1, 0.01, etc., to quickly sanity-check experiments without the full dataset.
+- **Checkpoint retention policy** – choose between `checkpoint_policy: 'best'` (keep only the best checkpoint) or `'all'` (save every epoch).
+- **Pre-test evaluator checks** – enable `global.pre_test` to sanity-check all evaluators (training-time and final) before the main run.
+- **Monitor split flexibility** – monitors can evaluate on validation or test splits (`split: 'val'|'test'`) to suit exploratory or theoretical comparisons.
+- **Grid search across models and training templates** – brace syntax (`"{a, b}"`, `{list}`) works for model hyperparameters and training template fields alike.
+- **Monitor uses evaluator functions** – monitoring logic reuses the same evaluator signatures, so any metric available in evaluation templates can be used for best-ckpt tracking.
+- **Structured logging & outputs** – each run creates a new versioned directory containing `run.log`, `debug.log`, `error.log`, per-experiment checkpoints/plots, two Excel summaries (grouped by dataset and by model), and a `timings.csv` with start/end times for profiling.
+
+## TODO
+
+- Add native sequence-to-sequence training/evaluation support (per-step labels, masks).
+- Provide probability-aware evaluator hooks (e.g., AUC/PR using logits → probability adapters).
+- Integrate additional state-of-the-art architectures out of the box.
+- Support CSV-based dataset ingestion alongside `.npy` collections.
 
 ---
 
@@ -376,4 +402,5 @@ benchmark/
 ---
 
 Happy benchmarking! For questions or contributions, open an issue or submit a pull request keeping the modular philosophy in mind.
+
 
