@@ -6,7 +6,7 @@ global:
   # device and checkpoint policy
   device: 'cuda'           # 'cuda' or 'cpu'
   checkpoint_policy: 'best'  # 'best' keeps only the best; 'all' saves every epoch
-  pre_test: true            # pre-check the availability of monitor evaluators for each experiment
+  # pre_test: true            # pre-check the availability of monitor evaluators for each experiment
 
   # project info
   author: Benchmark 
@@ -67,6 +67,21 @@ models:
     num_layers: "{3, 2, 1}"
     dropout: 0.2
 
+  PatchTST:
+    module: models/PatchTST/PatchTST_supervised/models/PatchTST_cls
+    class: PatchTSTClassifier
+    patch_len: "{4, 16, 64}"
+    stride: 8
+    d_model: 64
+    n_heads: 8
+    n_layers: 3
+    d_ff: 256
+    dropout: 0.1
+    pooling: attention
+    mlp_layers: 2
+    mlp_hidden: 128
+    mlp_dropout: 0.2
+
 # Experiment definitions - supports multiple experiments
 experiments:
   - name: "LSTM_NPY_UCI_HAR"
@@ -91,6 +106,17 @@ experiments:
       mode: max
       split: test
 
+  - name: "PatchTST_NPY_UCI_HAR"
+    model: "PatchTST"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
   - name: "LSTM_UCR2018"
     model: "LSTM"
     dataset_collection: "UCR_subset"
@@ -104,6 +130,17 @@ experiments:
 
   - name: "CNN_UCR2018"
     model: "CNN"
+    dataset_collection: "UCR_subset"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
+  - name: "PatchTST_UCR2018"
+    model: "PatchTST"
     dataset_collection: "UCR_subset"
     training: "supervised_debug_with_metrics"
     evaluation: "default"

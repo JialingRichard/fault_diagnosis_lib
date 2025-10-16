@@ -11,6 +11,8 @@ This README introduces the framework and provides a hands-on tutorial using `ben
 - [Fault Diagnosis Benchmark Framework](#fault-diagnosis-benchmark-framework)
   - [Table of Contents](#table-of-contents)
   - [Quick Start](#quick-start)
+    - [Option A: Python venv (Recommended)](#option-a-python-venv-recommended)
+    - [Option B: Conda](#option-b-conda)
   - [Key Flexibility Highlights](#key-flexibility-highlights)
   - [TODO](#todo)
   - [Configuration Walkthrough](#configuration-walkthrough)
@@ -33,16 +35,37 @@ This README introduces the framework and provides a hands-on tutorial using `ben
 ---
 
 ## Quick Start
+You may use either **Python venv (recommended)** or **Conda** to set up the environment.
+### Option A: Python venv (Recommended)
 
 ```bash
-conda create -n fault-benchmark python=3.10
-conda activate fault-benchmark
-pip install -r requirements.txt  # if provided, otherwise install torch, scikit-learn, matplotlib, numpy, pyyaml
+# Create virtual environment with Python 3.11
+python3.11 -m venv venv_fault_benchmark
+# Activate (Linux/macOS)
+source venv_fault_benchmark/bin/activate
+# Activate (Windows)
+# venv_fault_benchmark\Scripts\activate
 
+# Install dependencies
+# !!!For now, the requirements.txt is not completed, you have to install torch by yourself first
+pip install -r requirements.txt  # if missing, manually install torch, scikit-learn, numpy, pyyaml, matplotlib
+
+# Run benchmark
 cd benchmark
 python main.py configs/ExampleComplex.yaml
 ```
 
+###  Option B: Conda
+
+```bash
+conda create -n fault-benchmark python=3.11
+conda activate fault-benchmark
+# !!!For now, the requirements.txt is not completed, you have to install torch by yourself
+pip install -r requirements.txt  # if missing, manually install torch, scikit-learn, numpy, pyyaml, matplotlib
+
+cd benchmark
+python main.py configs/ExampleComplex.yaml
+```
 The command above runs every experiment defined in `ExampleComplex.yaml`, writes logs to `benchmark/results/<config_name>/v*/`, and produces summaries plus Excel exports.
 
 ---
