@@ -85,3 +85,5 @@ benchmark/results/
 
 !benchmark/data/UCR_subset/
 !benchmark/data/UCR_subset/**
+!benchmark/data/NPY_UCI_HAR/
+!benchmark/data/NPY_UCI_HAR/**
