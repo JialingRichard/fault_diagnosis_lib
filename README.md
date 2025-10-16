@@ -1,159 +1,124 @@
-# 故障诊断基准测试框架
+# Fault Diagnosis Benchmark Framework
 
-基于配置的多模型多数据集故障诊断基准测试框架，支持模块化组件、网格搜索与可复现实验。
+An opinionated, configuration-driven framework for benchmarking fault diagnosis models across multiple datasets. The project ships with a modular pipeline (data loading, preprocessing, training, evaluation, logging) so you can focus on defining experiments in YAML and extending individual components only when necessary.
 
-## 📁 项目结构
+This README introduces the framework and provides a hands-on tutorial using `benchmark/configs/ExampleComplex.yaml` as the canonical reference.
 
-```
-benchmark/
-├── main.py                      # 程序入口
-├── configs/                     # 配置文件
-│   └── NASA_IMS.yaml
-├── src/                         # 核心Loaders
-│   ├── config_loader.py         # 配置加载器
-│   ├── data_loader.py           # 数据加载器
-│   ├── model_loader.py          # 模型加载器
-│   ├── training_loader.py       # 训练加载器
-│   ├── eval_loader.py           # 评估加载器
-│   ├── epochinfo_loader.py      # Epoch信息加载器
-│   └── result_manager.py        # 结果管理器
-├── models/                      # 模型定义
-│   ├── LSTM.py
-│   └── CNN.py
-├── trainers/                    # 训练器
-│   └── supervised_trainer.py
-├── evaluators/                  # 评估器
-│   ├── f1.py
-│   ├── sklearn_metrics.py
-│   └── plot_label_distribution.py
-├── preprocessors/               # 预处理器
-│   ├── normalizers.py
-│   ├── noise_processors.py
-│   └── feature_engineering.py
-├── data/                        # 数据目录
-└── results/                     # 结果输出
-```
+---
 
-## 🔄 数据流向图
+## Table of Contents
 
-```
-配置文件(YAML) → ConfigLoader
-                     ↓
-       ┌─────────────┼─────────────┐
-       ↓             ↓             ↓
-   DataLoader    ModelLoader   TrainingLoader
-       ↓             ↓             ↓
-   数据+预处理  →    模型实例   →   训练器
-       ↓             ↓             ↓
-       └─────────────┼─────────────┘
-                     ↓
-              SupervisedTrainer
-              (训练循环 + 早停)
-                     ↓
-              EpochInfoLoader ←─→ EvalLoader
-              (实时显示信息)      (训练中评估)
-                     ↓
-               训练完成模型
-                     ↓
-               EvalLoader
-               (最终评估)
-                     ↓
-              ResultManager
-              (保存结果+日志)
-```
+1. [Quick Start](#quick-start)
+2. [Configuration Walkthrough](#configuration-walkthrough)
+   - [Global](#global)
+   - [Datasets](#datasets)
+   - [Models](#models)
+   - [Experiments](#experiments)
+   - [Training Templates](#training-templates)
+   - [Evaluation Templates](#evaluation-templates)
+3. [Running Experiments](#running-experiments)
+4. [Interpreting Outputs](#interpreting-outputs)
+5. [Extending the Framework](#extending-the-framework)
+   - [Datasets](#extending-datasets)
+   - [Preprocessors](#extending-preprocessors)
+   - [Models](#extending-models)
+   - [Trainers](#extending-trainers)
+   - [Evaluators](#extending-evaluators)
+6. [Project Layout](#project-layout)
 
-## 🧰 核心组件
+---
 
-### ConfigLoader
-- 加载和验证YAML配置文件
-
-### DataLoader  
-- 加载数据文件 (train/test split)
-- 执行预处理管道 (normalize → denoise → feature engineering)
-- 返回处理后的数据和元信息
-
-### ModelLoader
-- 根据配置动态加载模型类
-- 实例化模型并传入参数
-
-### TrainingLoader / SupervisedTrainer
-- 根据训练类型创建对应训练器
-- 显式验证集策略（validation_split）与早停（默认基于 val_loss）
-- 数据常驻 CPU，按 batch 搬运至 device，避免显存过载
-
-### EvalLoader
-- 动态加载评估函数
-- 支持多指标组合评估
-- 生成数值结果和可视化图表
-
-### EpochInfoLoader
-- 控制训练过程信息显示与训练期评估（依据训练模板的 `epochinfo`）
-- 训练期评估默认使用验证集（`epochinfo_split: 'val'`），日志行尾标注 `split:val|test`
-
-### ResultManager
-- 自动版本管理 (v1, v2, ...)
-- 实时日志记录
-- checkpoint保存和结果输出
-
-## 🚀 快速开始
+## Quick Start
 
 ```bash
+conda create -n fault-benchmark python=3.10
+conda activate fault-benchmark
+pip install -r requirements.txt  # if provided, otherwise install torch, scikit-learn, matplotlib, numpy, pyyaml
+
 cd benchmark
-python main.py configs/NASA_IMS.yaml
+python main.py configs/ExampleComplex.yaml
 ```
 
-## 💡 配置要点与示例
+The command above runs every experiment defined in `ExampleComplex.yaml`, writes logs to `benchmark/results/<config_name>/v*/`, and produces summaries plus Excel exports.
 
-### 1) 全局设置（必看）
+---
+
+## Configuration Walkthrough
+
+Every YAML file follows the structure below. The excerpts are taken directly from `benchmark/configs/ExampleComplex.yaml`.
+
 ```yaml
 global:
-  seed: 42                  # 随机种子（Python/NumPy/PyTorch）
-  deterministic: false      # 更强确定性（可能降低性能）
-  device: 'cuda'            # 训练设备
-  checkpoint_policy: 'best' # 'best' 仅保留最佳; 'all' 每个epoch都保存
-  pre_test: true            # 训练前预检 evaluator 可用性（用2条样本）
-```
+  seed: 42
+  deterministic: false
+  device: 'cuda'
+  checkpoint_policy: 'best'
+  pre_test: true
+  author: Benchmark
+  date: '2025-10-16'
+  description: Multi-model multi-dataset comparison experiment framework
+  version: '3.0'
 
-### 2) 训练模板（显式验证与训练期评估）
-```yaml
+datasets:
+  NPY_UCI_HAR:
+    train_data: ./data/NPY_UCI_HAR/train_X.npy
+    train_label: ./data/NPY_UCI_HAR/train_y.npy
+    test_data: ./data/NPY_UCI_HAR/test_X.npy
+    test_label: ./data/NPY_UCI_HAR/test_y.npy
+    preprocessing:
+      steps:
+        - name: "normalize"
+          file: "normalizers"
+          function: "standard_normalize"
+          params: {}
+        - name: "add_noise"
+          file: "noise_processors"
+          function: "add_gaussian_noise"
+          params: { noise_level: 0.01 }
+
+models:
+  LSTM:
+    module: models/LSTM
+    class: LSTM2one
+    hidden_dim: "{64, 128}"
+    num_layers: "{2, 3}"
+    dropout: 0.2
+
+experiments:
+  - name: "LSTM_NPY_UCI_HAR"
+    model: "LSTM"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
 training_templates:
   supervised_debug_with_metrics:
     type: supervised
     batch_size: 64
-    epochs: 3
+    epochs: 50
     lr: 0.001
     patience: 2
     optimizer: 'adam'
     print_interval: 1
-
-    # 验证集：须显式配置（不再默认0.2）
-    validation_split: 0.2     # (0,1) 之间; 或 0.0 禁止切分
-    # 若无验证集且确需用测试集充当验证集，需显式开启（自担风险）
-    # use_test_as_val: true
-
-    num_workers: 0            # DataLoader workers
-
-    # 训练期评估：引用 evaluation_templates 下的模板
-    epochinfo: 'train_acc'    # 轻量模板，仅 accuracy
-    epochinfo_split: 'val'    # 训练期评估使用的 split（默认 val）
-
-    # 最优 ckpt 监控：强约束，需显式指定
+    validation_split: 0.2
+    early_stop_use_monitor: true
+    epochinfo: 'train_acc'
+    epochinfo_split: 'val'
     monitor:
       metric: 'accuracy'
       mode: 'max'
-      split: 'val'            # 一般用 val；如设为 test 将打印警告
-```
+      split: 'val'
 
-### 3) 评估模板（扁平结构）
-```yaml
 evaluation_templates:
-  # 训练期轻量模板（仅 accuracy）
   train_acc:
     accuracy:
       file: sklearn_metrics
       function: accuracy_evaluate
-
-  # 最终评估模板（完整指标与可视化）
   default:
     f1: {}
     precision:
@@ -173,47 +138,242 @@ evaluation_templates:
       function: evaluate
 ```
 
-### 4) 模型（显式指定类名）
-```yaml
-models:
-  LSTM:
-    module: models/LSTM
-    class: LSTM2one          # 或 LSTM2seq（序列输出）
-    hidden_dim: 64
-    num_layers: 2
-    dropout: 0.2
+### Global
 
-  CNN:
-    module: models/CNN
-    class: CNN2one           # 或 CNN2seq（序列输出）
-    num_filters: 64
-    filter_sizes: [3,5,7]
-    num_layers: 3
-    dropout: 0.2
+`global` defines runtime behavior:
+
+- `seed`, `deterministic`: reproducibility settings pushed into Python/NumPy/PyTorch.
+- `device`: training device (`cuda` or `cpu`).
+- `checkpoint_policy`: `best` keeps only the best checkpoint (`best.pth`), `all` keeps every epoch.
+- `pre_test`: if true, the framework runs a lightweight evaluator sanity check before training.
+- Metadata fields (`author`, `description`, …) are copied into the run directory.
+
+Optional experiment-level summary control is handled under each experiment (see [Experiments](#experiments)).
+
+### Datasets
+
+- A dataset can either be a single `.npy` quartet (`train_X.npy`, `train_y.npy`, `test_X.npy`, `test_y.npy`) or a collection directory (`collection_path`) containing multiple sub-datasets with the same quartet layout.
+- `preprocessing.steps` list is optional. Each step is defined by `file`, `function`, and an optional `params` dict. The framework will import `preprocessors/<file>.py` and call the named function.
+- For collections, each sub-directory that contains the quartet is automatically expanded into separate experiments.
+
+### Models
+
+- `module`: Python module path relative to `benchmark/` (e.g., `models/LSTM`).
+- `class`: class name inside the module.
+- Any additional key/value pairs are forwarded as keyword arguments to the class constructor.
+- Strings wrapped in braces (e.g., `"{64, 128}"`) denote grid search candidates; the framework expands them automatically.
+
+### Experiments
+
+Each experiment combines a model, dataset (or dataset collection), training template, and evaluation template.
+
+- `name`: output directory name under `benchmark/results/<config_name>/v*/`.
+- `model`: key defined in the `models` section.
+- `dataset` or `dataset_collection`: choose between a single dataset or automatic expansion of a collection.
+- `training`: key referencing `training_templates`.
+- `evaluation`: key referencing `evaluation_templates`.
+- `summary` (optional): control how results are summarized/exported.
+  - `keep_only_best`: when true, only the best experiment for each (model, dataset) pair is kept in summaries.
+  - `metric`, `mode`, `split`: specify the metric and split (`test` or `val`) used to decide “best”.
+
+### Training Templates
+
+Re-usable training profiles consumed by the trainers.
+
+- `type`: maps to files under `benchmark/trainers/` (e.g., `supervised` → `supervised_trainer.py`).
+- Optimization parameters: `batch_size`, `epochs`, `lr`, `optimizer`, `patience`.
+- Logging: `print_interval` controls how often epoch info is printed.
+- Validation:
+  - `validation_split`: fraction of training data reserved for validation. Must be specified (or set `use_test_as_val: true` explicitly).
+  - `early_stop_use_monitor`: when true, early stopping follows the monitor metric instead of validation loss.
+- Monitoring:
+  - `epochinfo`: evaluation template used during training for logging/plots.
+  - `epochinfo_split`: split used during training when logging (`val` recommended).
+  - `monitor`: metric used to choose the best checkpoint. Includes `metric`, `mode` (`max`/`min`), and `split` (`val` or `test`).
+
+### Evaluation Templates
+
+Describe how metrics (and optional plots) are computed.
+
+- Flattened dictionary format: each key is a metric name.
+- `file` and `function` point to modules/functions under `benchmark/evaluators/`.
+- Metrics returning numbers are stored in summaries; returning `(figure, value)` will save the figure automatically.
+- You can define multiple templates (e.g., a lightweight `train_acc` for training-time logging and a comprehensive `default` for final evaluation).
+
+---
+
+## Running Experiments
+
+```bash
+cd benchmark
+python main.py configs/ExampleComplex.yaml              # run all experiments defined in the file
+python main.py configs/NASA_IMS.yaml --verbose          # optional verbose logging
 ```
 
-### 5) 实验示例
-```yaml
-experiments:
-  - name: "LSTM_NPY_UCI_HAR_baseline"
-    model: "LSTM"
-    dataset: "NPY_UCI_HAR"
-    training: "supervised_debug_with_metrics"
-    evaluation: "default"
+During execution the framework will:
+
+1. Validate the configuration.
+2. Expand grid search combinations and dataset collections.
+3. For each experiment:
+   - Run optional pre-checks (if `pre_test: true`).
+   - Load data, apply preprocessing steps.
+   - Instantiate the model and trainer.
+   - Train with early stopping/monitor logic.
+   - Evaluate on the specified split(s) and save metrics/plots/checkpoints.
+4. Summarize results and export Excel files (`results_by_dataset_*.xlsx`, `results_by_model_*.xlsx`).
+
+---
+
+## Interpreting Outputs
+
+Each run produces `benchmark/results/<config_name>/vXX_<timestamp>/` containing:
+
+- `run.log`: high-level progress (seed, experiments, metrics, warnings).
+- `debug.log`: detailed logs (DEBUG level, evaluator traces, stack traces if any).
+- `error.log`: aggregated experiment failures (if any).
+- `timings.csv`: per-experiment timing summary.
+- One sub-folder per experiment:
+  - `plots/`: generated figures (training epoch info, final evaluation plots).
+  - `checkpoints/`: saved checkpoints (`best.pth`, and optionally per-epoch `.pth` files if `checkpoint_policy='all'`).
+  - `config.yaml`: snapshot of the YAML used.
+
+---
+
+## Extending the Framework
+
+Most components live under `benchmark/`. The following guidelines show how to create your own datasets, preprocessors, models, trainers, and evaluators.
+
+### Extending Datasets
+
+**Single dataset**
+
+1. Prepare four NumPy files: `train_X.npy`, `train_y.npy`, `test_X.npy`, `test_y.npy` (shape: `(samples, sequence_length, feature_dim)` for X, `(samples,)` or `(samples, sequence_length)` for y).
+2. Place them under `benchmark/data/<your_dataset>/`.
+3. Register in YAML:
+
+   ```yaml
+   datasets:
+     MyDataset:
+       train_data: ./data/MyDataset/train_X.npy
+       train_label: ./data/MyDataset/train_y.npy
+       test_data: ./data/MyDataset/test_X.npy
+       test_label: ./data/MyDataset/test_y.npy
+   ```
+
+**Dataset collection**
+
+1. Create a directory `./data/MyCollection/`.
+2. Inside, create one sub-directory per dataset (`dataset_a`, `dataset_b`, …), each containing the quartet of `.npy` files.
+3. Register in YAML:
+
+   ```yaml
+   datasets:
+     MyCollection:
+       collection_path: ./data/MyCollection
+   ```
+
+### Extending Preprocessors
+
+1. Implement a function in `benchmark/preprocessors/<file>.py`:
+
+   ```python
+   def standard_normalize(data, params):
+       mean = params.get('mean', data.mean(axis=0, keepdims=True))
+       std = params.get('std', data.std(axis=0, keepdims=True) + 1e-6)
+       return (data - mean) / std
+   ```
+
+2. Reference it in YAML:
+
+   ```yaml
+   preprocessing:
+     steps:
+       - name: "normalize"
+         file: "normalizers"
+         function: "standard_normalize"
+         params:
+           mean: null
+           std: null
+   ```
+
+The function signature must be `(array, params_dict)` and return the transformed array.
+
+### Extending Models
+
+1. Create your model under `benchmark/models/<MyModel>.py`.
+2. Expose a class whose constructor accepts `input_dim`, `output_dim`, plus any custom kwargs.
+3. Register it in YAML:
+
+   ```yaml
+   models:
+     MyModel:
+       module: models/MyModel
+       class: MyNet
+       hidden_dim: 128
+       num_layers: 3
+   ```
+
+Grid-search values can be supplied via string braces (`"{64, 128}"`).
+
+### Extending Trainers
+
+1. Place a new trainer in `benchmark/trainers/<my_trainer>.py`.
+2. Inherit from `SupervisedTrainer` or build from scratch.
+3. Update `training_templates` to point to it:
+
+   ```yaml
+   training_templates:
+     my_custom_training:
+       type: my_custom              # loads trainers/my_custom_trainer.py
+       trainer_file: my_custom_trainer
+       trainer_class: MyCustomTrainer
+       ...
+   ```
+
+The loader will import `trainers/<trainer_file>.py` and instantiate `trainer_class`.
+
+### Extending Evaluators
+
+1. Create `benchmark/evaluators/<my_metric>.py` with a callable `evaluate` function:
+
+   ```python
+   def evaluate(X_train, y_train, y_train_pred, X_test, y_test, y_test_pred):
+       return float(my_metric(y_test, y_test_pred))
+   ```
+
+2. Reference it in an evaluation template:
+
+   ```yaml
+   evaluation_templates:
+     default:
+       my_metric:
+         file: my_metric
+         function: evaluate
+   ```
+
+Evaluators can return:
+- A number (stored as a metric).
+- A string (logged as-is).
+- A matplotlib Figure, or `(Figure, numeric_value)` tuple. Figures are saved automatically.
+
+---
+
+## Project Layout
+
+```
+benchmark/
+├── main.py                  # CLI entry point
+├── configs/                 # Experiment YAML files (ExampleComplex.yaml, etc.)
+├── data/                    # Datasets (npy files or collections)
+├── evaluators/              # Metric implementations
+├── models/                  # Model definitions (LSTM, CNN, custom)
+├── preprocessors/           # Data preprocessing steps
+├── results/                 # Generated runs, logs, metrics, plots
+├── src/                     # Loaders, managers, utilities
+└── trainers/                # Training strategy implementations
 ```
 
-## 📒 日志与结果
-- run.log：INFO 概览（包含全局配置、实验清单、训练/评估摘要）
-- debug.log：DEBUG 细节（包含 traceback；已过滤 matplotlib findfont 噪声）
-- error.log：错误与堆栈（预检/训练/评估异常时写入上下文+traceback）
-- best.pth：在 checkpoints/ 下维护最佳模型（按 monitor 指标与 split）
+---
 
-## ✅ 预检（可选）
-- 打开 `global.pre_test: true` 后，框架在正式训练前会用 2 条训练样本对：
-  - 训练期模板（epochinfo）与最终模板（evaluation）中的每个 evaluator 做一次调用
-  - 仅对 monitor 指标强制为数值；其余只需不抛错
+Happy benchmarking! For questions or contributions, open an issue or submit a pull request keeping the modular philosophy in mind.
 
-## ⚠️ 常见提醒
-- 如未配置 `validation_split` 且未显式 `use_test_as_val: true`，将直接报错（不再隐式用 0.2 或回退 test）
-- 若 `epochinfo_split` 或 `monitor.split` 使用 `'test'`，训练开始时会打印警告，提示可能信息泄露
-- 概率型指标（如 AUC/PR）需要模型概率输出；若只提供 argmax，相关指标将不可用或需在 evaluator 内自行转换

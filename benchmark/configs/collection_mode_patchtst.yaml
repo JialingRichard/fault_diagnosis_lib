@@ -1,11 +1,18 @@
-# 全局设备设置
-device: 'cuda'
-# 实验配置信息
-experiment_info:
-  author: Benchmark Team
-  date: '2025-09-24'
-  description: 多模型多数据集对比实验框架
-  version: '2.0'
+global:
+  # seed for reproducibility
+  seed: 42                 # global random seed（Python/NumPy/PyTorch）
+  deterministic: false     # set to true for stronger determinism (may reduce performance)
+
+  # device and checkpoint policy
+  device: 'cuda'           # 'cuda' or 'cpu'
+  checkpoint_policy: 'best'  # 'best' keeps only the best; 'all' saves every epoch
+  pre_test: true            # pre-check the availability of monitor evaluators for each experiment
+
+  # project info
+  author: Benchmark 
+  date: '2025-10-16'
+  description: Multi-model multi-dataset comparison experiment framework
+  version: '3.0'
 
 # 数据集定义 - 支持多个数据集
 datasets:
@@ -145,41 +152,6 @@ training_templates:
       split: 'val'
 
 experiments:
-  # - name: "LSTM_NASA_IMS_classification_debug"
-  #   model: "LSTM"
-  #   dataset: "NASA_IMS"
-  #   training: "classification_normal_fast"
-  #   evaluation: "default"
-    
-  # - name: "CNN_NASA_IMS_classification_debug"
-  #   model: "CNN"
-  #   dataset: "NASA_IMS"
-  #   training: "classification_normal_fast"
-  #   evaluation: "default"
-
-  # - name: "LSTM_NPY_UCI_HAR_classification_fast"
-  #   model: "LSTM"
-  #   dataset: "NPY_UCI_HAR"
-  #   training: "classification_normal"
-  #   evaluation: "default"
-    
-  # - name: "CNN_NPY_UCI_HAR_classification_fast"
-  #   model: "CNN"
-  #   dataset: "NPY_UCI_HAR"
-  #   training: "classification_normal"
-  #   evaluation: "default"
-
-  # - name: "PatchTST_NASA_IMS_classification"
-  #   model: "PatchTST"
-  #   dataset: "NASA_IMS"
-  #   training: "classification_normal_fast"
-  #   evaluation: "default"
-
-  # - name: "PatchTST_NPY_UCI_HAR_classification"
-  #   model: "PatchTST"
-  #   dataset: "NPY_UCI_HAR"
-  #   training: "classification_normal"
-  #   evaluation: "default"
 
   - name: "LSTM"
     model: "LSTM"

@@ -22,14 +22,49 @@ datasets:
     test_data: ./data/NPY_UCI_HAR/test_X.npy
     test_label: ./data/NPY_UCI_HAR/test_y.npy
     preprocessing:
+      steps:
+        - name: "normalize"
+          file: "normalizers"
+          function: "standard_normalize"
+          params: {}
+        
+        - name: "add_noise"
+          file: "noise_processors"
+          function: "add_gaussian_noise"
+          params: 
+            noise_level: 0.01
+        
+        - name: "remove_outliers"
+          file: "noise_processors"
+          function: "remove_outliers"
+          params:
+            threshold: 3.0
+        
+        - name: "feature_engineering"
+          file: "feature_engineering"
+          function: "add_statistical_features"
+          params: {}
+
+  # directory-based dataset collection
+  UCR_subset:
+    collection_path: ./data/UCR_subset
+
 
 # model definitions
 models:
   LSTM:
     module: models/LSTM    # python file path
     class: LSTM2one        # class model name
-    hidden_dim: 64
-    num_layers: 2
+    hidden_dim: "{64, 128}" # grid search use ""
+    num_layers: "{2, 3}"
+    dropout: 0.2
+
+  CNN:
+    module: models/CNN     # python file path
+    class: CNN2one         # class model name
+    num_filters: 64
+    filter_sizes: "{[3, 5, 7], [3, 5], [3]}"
+    num_layers: "{3, 2, 1}"
     dropout: 0.2
 
 # Experiment definitions - supports multiple experiments
@@ -37,6 +72,39 @@ experiments:
   - name: "LSTM_NPY_UCI_HAR"
     model: "LSTM"
     dataset: "NPY_UCI_HAR"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+    
+  - name: "CNN_NPY_UCI_HAR"
+    model: "CNN"
+    dataset: "NPY_UCI_HAR"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
+  - name: "LSTM_UCR2018"
+    model: "LSTM"
+    dataset_collection: "UCR_subset"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
+  - name: "CNN_UCR2018"
+    model: "CNN"
+    dataset_collection: "UCR_subset"
     training: "supervised_debug_with_metrics"
     evaluation: "default"
     summary:
@@ -59,9 +127,18 @@ training_templates:
     # use_test_as_val: true  # use test set as validation set, dangerous operation
     validation_split: 0.2  # use 20% of training set as validation set
     # early stopping criteria: true stops early based on monitor metric; false/none stops early based on val_loss
+    early_stop_use_monitor: true
     # training period metrics and visualization: use lightweight template (only accuracy)
     epochinfo: 'train_acc'
-    
+    # training period evaluation data split (default val, avoid information leakage)
+    # best ckpt monitoring: force specify monitoring source and rules
+    # monitoring template is implicitly the epochinfo specified template above
+    monitor:
+      metric: 'accuracy'        # metric name (must be defined in template)
+      mode: 'max'               # 'min' or 'max' (must be explicitly specified)
+      split: 'val'             # 'val', 'test' (must be explicitly specified)
+
+
 # evaluation configuration templates
 evaluation_templates:
   # training period lightweight template: only accuracy (for quick monitoring and best selection)
