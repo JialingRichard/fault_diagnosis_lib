@@ -68,6 +68,8 @@ The command above runs every experiment defined in `ExampleComplex.yaml`, writes
 - Support CSV-based dataset ingestion alongside `.npy` collections.
 
 ---
+![alt text](noteimg/image-2.png)
+![alt text](noteimg/image-3.png)
 
 ## Configuration Walkthrough
 
