@@ -35,25 +35,8 @@ This README introduces the framework and provides a hands-on tutorial using `ben
 ---
 
 ## Quick Start
-You may use either **Python venv (recommended)** or **Conda** to set up the environment.
-### Lightning AI example
-```bash
-# Create virtual environment with Python 3.11
-python3.11 -m venv venv_fault_benchmark
-# Activate (Linux/macOS)
-source venv_fault_benchmark/bin/activate
-# Activate (Windows)
-# venv_fault_benchmark\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt  # if missing, manually install torch, scikit-learn, numpy, pyyaml, matplotlib
-
-# Run benchmark
-cd benchmark
-python main.py configs/ExampleComplex.yaml
-```
-
-### Online Option: Run on Lightning AI Studio (T4 GPU)
+### Online Option: Run on Lightning AI Studio (GPU)
 
 This option allows you to run the benchmark directly on a cloud GPU environment.
 
@@ -77,7 +60,7 @@ cd fault_diagnosis_lib/benchmark/
 # 6. Run the benchmark with a sample configuration
 python main.py configs/ExampleComplex.yaml
 ```
-
+You may also use local **Python venv (recommended)** or **Conda** to set up the environment.
 ### Local Option A: Python venv
 
 ```bash
