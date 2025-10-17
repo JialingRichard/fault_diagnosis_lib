@@ -144,6 +144,10 @@ class SupervisedTrainer:
         self.best_val_loss = float('inf')
         self.patience_counter = 0
         self.training_history = {'train_loss': [], 'val_loss': []}
+        # Progress bar controls (bar100 only)
+        self.use_progress_bar = bool(self.config.get('progress_bar', False))
+        self._epoch_index = 0
+        self._total_epochs = 0
         
         # Initialize epoch info loader
         self.epochinfo_loader = EpochInfoLoader()
@@ -155,6 +159,12 @@ class SupervisedTrainer:
         self._cached_train_pred = None
         self._cached_val_pred = None
         self._cached_test_pred = None
+        # Control per-epoch prediction caching via config
+        self.compute_train_pred_each_epoch = bool(self.config.get('compute_train_pred_each_epoch', False))
+        # If monitoring by metrics (not val_loss), val predictions are often needed; default True then
+        default_val_pred = False if str(self.config.get('monitor', {}).get('metric', 'val_loss')).lower() == 'val_loss' else True
+        self.compute_val_pred_each_epoch = bool(self.config.get('compute_val_pred_each_epoch', default_val_pred))
+        self.compute_test_pred_each_epoch = bool(self.config.get('compute_test_pred_each_epoch', False))
         
         # Read global and monitor configuration (strict)
         gcfg = (self.full_config.get('global') or {}) if isinstance(self.full_config, dict) else {}
@@ -223,6 +233,9 @@ class SupervisedTrainer:
         print(f"   {epochs} epochs (patience:{patience})")
         
         for epoch in range(epochs):
+            # expose epoch indices for progress bar descriptions
+            self._epoch_index = epoch
+            self._total_epochs = epochs
             # Train
             train_loss = self._train_epoch()
             
@@ -231,16 +244,16 @@ class SupervisedTrainer:
             
             # Generate predictions for this epoch (cache for epochinfo/monitor)
             try:
-                self._cached_train_pred = self.predict(self.X_train)
+                self._cached_train_pred = self.predict(self.X_train, show_progress=False) if self.compute_train_pred_each_epoch else None
             except Exception:
                 self._cached_train_pred = None
             try:
                 # Validate and test are computed to avoid double calls
-                self._cached_val_pred = self.predict(self.X_val)
+                self._cached_val_pred = self.predict(self.X_val, show_progress=False) if self.compute_val_pred_each_epoch else None
             except Exception:
                 self._cached_val_pred = None
             try:
-                self._cached_test_pred = self.predict(self.X_test)
+                self._cached_test_pred = self.predict(self.X_test, show_progress=False) if self.compute_test_pred_each_epoch else None
             except Exception:
                 self._cached_test_pred = None
 
@@ -336,9 +349,9 @@ class SupervisedTrainer:
             except Exception as e:
                 logging.getLogger(__name__).warning(f"Failed to load best checkpoint, using current model: {e}")
 
-        # Generate predictions
-        train_pred = self.predict(self.X_train)
-        test_pred = self.predict(self.X_test)
+        # Generate predictions (show progress at final evaluation)
+        train_pred = self.predict(self.X_train, show_progress=True)
+        test_pred = self.predict(self.X_test, show_progress=True)
         
         results = {
             'final_train_loss': train_loss,
@@ -411,27 +424,51 @@ class SupervisedTrainer:
         self.model.train()
         total_loss = 0.0
         
-        for batch_X, batch_y in self.train_loader:
+        iterator = self.train_loader
+        total_batches = max(1, len(self.train_loader))
+        printed_pct = 0
+        if self.use_progress_bar:
+            try:
+                sys.stderr.write('[Train] ' + ('#' * 100) + "\n")
+                sys.stderr.write('[Train] ')
+                sys.stderr.flush()
+            except Exception:
+                pass
+
+        for bidx, (batch_X, batch_y) in enumerate(iterator, start=1):
             self.optimizer.zero_grad()
-            
+
             # forward pass
             batch_X = batch_X.to(self.device, non_blocking=True)
             batch_y = batch_y.to(self.device, non_blocking=True)
             outputs = self.model(batch_X)
-            
+
             # need to reshape if output is sequence
             if len(outputs.shape) == 3:  # (batch, seq, features)
                 outputs = outputs.reshape(-1, outputs.shape[-1])
                 batch_y = batch_y.repeat_interleave(outputs.shape[0] // batch_y.shape[0])
-            
+
             loss = self.criterion(outputs, batch_y)
 
             # backward pass
             loss.backward()
             self.optimizer.step()
-            
+
             total_loss += loss.item()
-        
+            if self.use_progress_bar:
+                # print one '-' for each new percent crossed (stderr only)
+                try:
+                    pct = int((bidx * 100) / total_batches)
+                    while printed_pct < pct:
+                        sys.stderr.write('-')
+                        sys.stderr.flush()
+                        printed_pct += 1
+                    if bidx == total_batches:
+                        sys.stderr.write('\n')
+                        sys.stderr.flush()
+                except Exception:
+                    pass
+
         return total_loss / len(self.train_loader)
     
     def _validate(self) -> float:
@@ -450,7 +487,18 @@ class SupervisedTrainer:
         )
         
         with torch.no_grad():
-            for batch_X, batch_y in val_loader:
+            iterator = val_loader
+            total_batches = max(1, len(val_loader))
+            printed_pct = 0
+            if self.use_progress_bar:
+                try:
+                    sys.stderr.write('[Val  ] ' + ('#' * 100) + "\n")
+                    sys.stderr.write('[Val  ] ')
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+
+            for bidx, (batch_X, batch_y) in enumerate(iterator, start=1):
                 batch_X = batch_X.to(self.device, non_blocking=True)
                 batch_y = batch_y.to(self.device, non_blocking=True)
                 outputs = self.model(batch_X)
@@ -459,15 +507,32 @@ class SupervisedTrainer:
                 if len(outputs.shape) == 3:
                     outputs = outputs.reshape(-1, outputs.shape[-1])
                     batch_y = batch_y.repeat_interleave(outputs.shape[0] // batch_y.shape[0])
-                
+
                 loss = self.criterion(outputs, batch_y)
                 total_loss += loss.item()
                 batch_count += 1
+                if self.use_progress_bar:
+                    try:
+                        pct = int((bidx * 100) / total_batches)
+                        while printed_pct < pct:
+                            sys.stderr.write('-')
+                            sys.stderr.flush()
+                            printed_pct += 1
+                        if bidx == total_batches:
+                            sys.stderr.write('\n')
+                            sys.stderr.flush()
+                    except Exception:
+                        pass
         
         return total_loss / batch_count if batch_count > 0 else 0.0
     
-    def predict(self, X: torch.Tensor) -> np.ndarray:
-        """Generate predictions - use batching to avoid OOM"""
+    def predict(self, X: torch.Tensor, show_progress: bool = True) -> np.ndarray:
+        """Generate predictions - use batching to avoid OOM.
+
+        Args:
+            X: tensor dataset to predict
+            show_progress: whether to show bar100 on stderr
+        """
         self.model.eval()
         all_predictions = []
 
@@ -481,8 +546,30 @@ class SupervisedTrainer:
             num_workers=int(self.config.get('num_workers', 0))
         )
         
+        # Determine progress label
+        label = 'Predict'
+        try:
+            if X.data_ptr() == self.X_test.data_ptr():
+                label = 'Test'
+            elif hasattr(self, 'X_val') and X.data_ptr() == self.X_val.data_ptr():
+                label = 'Val'
+            elif X.data_ptr() == self.X_train.data_ptr():
+                label = 'Train'
+        except Exception:
+            label = 'Predict'
+
+        total_batches = max(1, len(data_loader))
+        printed_pct = 0
+        if self.use_progress_bar and show_progress:
+            try:
+                sys.stderr.write(f'[{label:<5}] ' + ('#' * 100) + "\n")
+                sys.stderr.write(f'[{label:<5}] ')
+                sys.stderr.flush()
+            except Exception:
+                pass
+
         with torch.no_grad():
-            for (batch_X,) in data_loader:
+            for bidx, (batch_X,) in enumerate(data_loader, start=1):
                 batch_X = batch_X.to(self.device, non_blocking=True)
                 outputs = self.model(batch_X)
 
@@ -492,6 +579,18 @@ class SupervisedTrainer:
 
                 predictions = torch.argmax(outputs, dim=1)
                 all_predictions.append(predictions.cpu().numpy())
+                if self.use_progress_bar and show_progress:
+                    try:
+                        pct = int((bidx * 100) / total_batches)
+                        while printed_pct < pct:
+                            sys.stderr.write('-')
+                            sys.stderr.flush()
+                            printed_pct += 1
+                        if bidx == total_batches:
+                            sys.stderr.write('\n')
+                            sys.stderr.flush()
+                    except Exception:
+                        pass
         
         return np.concatenate(all_predictions)
     

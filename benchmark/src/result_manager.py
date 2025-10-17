@@ -70,26 +70,79 @@ class ResultManager:
         return run_dir
     
     def _setup_logging(self):
-        """Setup live logging with multiple handlers"""
+        """Setup live logging with multiple handlers
+
+        Goals:
+        - run.log: capture everything printed to stdout (print and console logging)
+        - debug.log: superset of run.log (also includes DEBUG-level logs); to avoid duplicate INFO+ lines,
+          the debug handler only writes records below INFO (i.e., DEBUG). INFO+ will enter debug.log via TeeStream.
+        - error.log: capture ERROR+ records
+        """
         # 1) Capture warnings to logging
         logging.captureWarnings(True)
 
-        # 2) Redirect print to run.log
+        # Paths used by handlers and tee
+        debug_log_path = self.run_dir / 'debug.log'
+
+        # 2) Redirect print to run.log and debug.log (tee)
         class TeeStream:
-            def __init__(self, log_file):
+            def __init__(self, log_files):
                 self.terminal = sys.stdout
-                self.log_file = open(log_file, 'a', encoding='utf-8')
+                # Open all log files in append mode
+                self._files = [open(str(p), 'a', encoding='utf-8') for p in log_files]
 
             def write(self, message):
                 self.terminal.write(message)
-                self.log_file.write(message)
-                self.log_file.flush()  # flush log file immediately
+                for f in self._files:
+                    f.write(message)
+                    f.flush()
 
             def flush(self):
                 self.terminal.flush()
-                self.log_file.flush()
+                for f in self._files:
+                    f.flush()
 
-        sys.stdout = TeeStream(self.log_file)
+            def close(self):
+                for f in self._files:
+                    try:
+                        f.close()
+                    except Exception:
+                        pass
+
+        # Replace stdout with tee stream (run.log + debug.log)
+        sys.stdout = TeeStream([self.log_file, debug_log_path])
+
+        # Additionally, tee stderr to debug.log only (and keep terminal stderr)
+        class TeeErr:
+            def __init__(self, log_file_path):
+                self.terminal = sys.__stderr__ if hasattr(sys, '__stderr__') else sys.stderr
+                self.log_file = open(str(log_file_path), 'a', encoding='utf-8')
+            def write(self, message):
+                try:
+                    self.terminal.write(message)
+                except Exception:
+                    pass
+                try:
+                    self.log_file.write(message)
+                    self.log_file.flush()
+                except Exception:
+                    pass
+            def flush(self):
+                try:
+                    self.terminal.flush()
+                except Exception:
+                    pass
+                try:
+                    self.log_file.flush()
+                except Exception:
+                    pass
+            def close(self):
+                try:
+                    self.log_file.close()
+                except Exception:
+                    pass
+
+        sys.stderr = TeeErr(debug_log_path)
 
         # 3) Configure root logger (DEBUG), handlers control output levels
         root_logger = logging.getLogger()
@@ -112,15 +165,14 @@ class ResultManager:
             ))
             root_logger.addHandler(console_handler)
 
-        # Debug details: write to debug.log (DEBUG+)
-        debug_log_path = self.run_dir / 'debug.log'
+        # Debug details: write to debug.log, but avoid duplicating INFO+ (already tee'd to debug.log)
         debug_handler = logging.FileHandler(debug_log_path, mode='a', encoding='utf-8')
         debug_handler.setLevel(logging.DEBUG)
         debug_handler.setFormatter(logging.Formatter(
             fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         ))
-        # filter matplotlib.font_manager findfont noise
+        # filter matplotlib.font_manager findfont noise and filter out INFO+
         class _MatplotlibFindfontFilter(logging.Filter):
             def filter(self, record: logging.LogRecord) -> bool:
                 try:
@@ -129,7 +181,15 @@ class ResultManager:
                 except Exception:
                     pass
                 return True
+        class _BelowInfoFilter(logging.Filter):
+            def filter(self, record: logging.LogRecord) -> bool:
+                # Only keep records with level below INFO (i.e., DEBUG)
+                try:
+                    return int(record.levelno) < int(logging.INFO)
+                except Exception:
+                    return True
         debug_handler.addFilter(_MatplotlibFindfontFilter())
+        debug_handler.addFilter(_BelowInfoFilter())
         key_debug = type(debug_handler).__name__ + str(debug_log_path)
         if key_debug not in existing:
             root_logger.addHandler(debug_handler)
@@ -237,6 +297,17 @@ class ResultManager:
     
     def cleanup(self):
         """清理资源"""
-        if hasattr(sys.stdout, 'log_file'):
-            sys.stdout.log_file.close()
+        # Close tee files if present and restore stdout/stderr
+        if hasattr(sys.stdout, 'close') and hasattr(sys.stdout, 'terminal'):
+            try:
+                sys.stdout.close()
+            except Exception:
+                pass
             sys.stdout = sys.stdout.terminal  # restore original stdout
+        if hasattr(sys, '__stderr__'):
+            try:
+                if hasattr(sys.stderr, 'close'):
+                    sys.stderr.close()
+            except Exception:
+                pass
+            sys.stderr = sys.__stderr__

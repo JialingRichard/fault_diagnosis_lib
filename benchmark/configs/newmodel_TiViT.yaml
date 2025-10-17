@@ -1,0 +1,189 @@
+global:
+  # seed for reproducibility
+  seed: 42                 # global random seed（Python/NumPy/PyTorch）
+  deterministic: false     # set to true for stronger determinism (may reduce performance)
+
+  # device and checkpoint policy
+  device: 'cuda'           # 'cuda' or 'cpu'
+  checkpoint_policy: 'best'  # 'best' keeps only the best; 'all' saves every epoch
+  pre_test: true            # pre-check the availability of monitor evaluators for each experiment
+
+  # project info
+  author: Benchmark 
+  date: '2025-10-16'
+  description: Multi-model multi-dataset comparison experiment framework
+  version: '3.0'
+
+# DataSet definition - supports single or multiple datasets
+datasets:
+  NPY_UCI_HAR:
+    train_data: ./data/NPY_UCI_HAR/train_X.npy
+    train_label: ./data/NPY_UCI_HAR/train_y.npy
+    test_data: ./data/NPY_UCI_HAR/test_X.npy
+    test_label: ./data/NPY_UCI_HAR/test_y.npy
+    preprocessing:
+      
+  # directory-based dataset collection
+  UCR_subset:
+    collection_path: ./data/UCR_subset
+
+# model definitions
+models:
+  LSTM:
+    module: models/LSTM    # python file path
+    class: LSTM2one        # class model name
+    hidden_dim: "{64, 128}" # grid search use ""
+    num_layers: 3
+    dropout: 0.2
+
+  CNN:
+    module: models/CNN     # python file path
+    class: CNN2one         # class model name
+    num_filters: 64
+    filter_sizes: "{[3, 5, 7], [3, 5]}"
+    num_layers: "{3, 2}"
+    dropout: 0.2
+
+  PatchTST:
+    module: models/PatchTST/PatchTST_supervised/models/PatchTST_cls
+    class: PatchTSTClassifier
+    patch_len: "{4, 64}"
+    stride: 8
+    d_model: 64
+    n_heads: 8
+    n_layers: 3
+    d_ff: 256
+    dropout: 0.1
+    pooling: attention
+    mlp_layers: 2
+    mlp_hidden: 128
+    mlp_dropout: 0.2
+
+  TiViT:
+    module: models/TiViTClassifier   # new HF-based TiViT wrapper
+    class: TiViT2one
+    # Backbone and representation
+    vit_name: facebook/dinov2-base   # default backbone
+    vit_layer: 14                    # layer index for representation (truncation)
+    aggregation: mean                # 'mean' or 'cls_token'
+    # Time-to-image params
+    patch_size: sqrt                 # use round(sqrt(T))
+    stride: 1.0                      # no overlap for minimal run
+    image_size: 224
+    # Training behavior
+    freeze_vit: true                 # train only linear head
+    l2norm: true                     # L2-normalize concatenated features
+    head_dropout: 0.0
+
+# Experiment definitions - supports multiple experiments
+experiments:
+  # - name: "LSTM_NPY_UCI_HAR"
+  #   model: "LSTM"
+  #   dataset: "NPY_UCI_HAR"
+  #   training: "supervised_debug_with_metrics"
+  #   evaluation: "default"
+  #   summary:
+  #     keep_only_best: true
+  #     metric: accuracy
+  #     mode: max
+  #     split: test
+
+  - name: "TiViT_UCR_subset"
+    model: "TiViT"
+    dataset_collection: "UCR_subset"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
+  - name: "LSTM_UCR_subset"
+    model: "LSTM"
+    dataset_collection: "UCR_subset"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
+  - name: "CNN_UCR_subset"
+    model: "CNN"
+    dataset_collection: "UCR_subset"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+
+  - name: "PatchTST_UCR_subset"
+    model: "PatchTST"
+    dataset_collection: "UCR_subset"
+    training: "supervised_debug_with_metrics"
+    evaluation: "default"
+    summary:
+      keep_only_best: true
+      metric: accuracy
+      mode: max
+      split: test
+  
+
+# Training configuration templates
+training_templates:
+  supervised_debug_with_metrics:
+    type: supervised # supervised training using file benchmark/trainers/supervised_trainer.py
+    batch_size: 64
+    epochs: 20
+    lr: "{0.001, 0.0001}"  # grid search use 
+    patience: 5          # early stopping patience
+    optimizer: 'adam'
+    print_interval: 1   # print each N epoch
+    data_fraction: 1.0  # use fraction of dataset for quick testing eg 0.01/0.1/1.0
+    # use_test_as_val: true  # use test set as validation set, dangerous operation
+    validation_split: 0.2  # use 20% of training set as validation set
+    # early stopping criteria: true stops early based on monitor metric; false/none stops early based on val_loss
+    # training period metrics and visualization: use lightweight template (only accuracy)
+    epochinfo: 'train_acc'
+    epochinfo_split: 'val'
+    monitor:
+      metric: accuracy
+      mode: max
+      split: val
+    # show per-epoch progress bars (tqdm)
+    progress_bar: true
+    # Per-epoch prediction caching (controls overhead and debug progress bars)
+    compute_train_pred_each_epoch: false
+    compute_val_pred_each_epoch: true   # set to false if monitor.metric == 'val_loss'
+    compute_test_pred_each_epoch: false
+    
+# evaluation configuration templates
+evaluation_templates:
+  # training period lightweight template: only accuracy (for quick monitoring and best selection)
+  train_acc:
+    accuracy:
+      file: sklearn_metrics
+      function: accuracy_evaluate
+
+  default:
+    f1:
+      # default: evaluators/f1.py  evaluate function 
+    precision:
+      file: sklearn_metrics  # use sklearn_metrics.py
+      function: precision_evaluate  # call precision_evaluate function
+    recall:
+      file: sklearn_metrics
+      function: recall_evaluate
+    accuracy:
+      file: sklearn_metrics
+      function: accuracy_evaluate
+    train_test_gap:
+      file: sklearn_metrics
+      function: train_test_gap_evaluate
+    test_samples:
+      file: plot_label_distribution  # use plot_label_distribution.py
+      function: evaluate  # will generate label distribution plot

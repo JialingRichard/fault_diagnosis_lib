@@ -5,6 +5,7 @@ Dynamically loads and executes epoch info print functions.
 """
 
 import importlib.util
+import numpy as np
 import logging
 from pathlib import Path
 from typing import Dict, Any, Callable
@@ -168,9 +169,15 @@ class EpochInfoLoader:
                         epochinfo_split = 'val'
 
                     # Get/cache required predictions
+                    # Decide whether any metric requires train predictions
+                    need_train_pred = self._template_needs_train_pred(eval_template_name, config)
                     train_pred = epoch_data.get('train_pred')
-                    if train_pred is None:
-                        train_pred = trainer.predict(trainer.X_train)
+                    if need_train_pred and train_pred is None:
+                        # compute silently to avoid extra progress noise
+                        train_pred = trainer.predict(trainer.X_train, show_progress=False)
+                    elif not need_train_pred:
+                        # provide placeholder to evaluators that ignore train channel
+                        train_pred = np.empty((0,))
 
                     if epochinfo_split == 'val':
                         # Select validation set as evaluation "test channel"
@@ -230,3 +237,37 @@ class EpochInfoLoader:
 
         # Print in one line
         print(f"{basic_info}{metrics_str}")
+
+    def _template_needs_train_pred(self, eval_template_name: str, config: Dict[str, Any]) -> bool:
+        """Heuristically decide whether any metric in the template needs train predictions.
+
+        Rules:
+        - If any metric config sets needs_train_pred: true, return True.
+        - Known metrics requiring train channel: metric name 'train_test_gap' or
+          module evaluators.sklearn_metrics with function 'train_test_gap_evaluate'.
+        """
+        try:
+            eval_templates = config.get('evaluation_templates', {})
+            tpl = eval_templates.get(eval_template_name, {})
+            # Flattened template support
+            if isinstance(tpl, dict) and 'metrics' not in tpl:
+                metrics = {k: v for k, v in tpl.items() if not str(k).startswith('_')}
+            else:
+                metrics = tpl.get('metrics', {}) or {}
+
+            for metric_name, metric_cfg in metrics.items():
+                # explicit flag
+                if isinstance(metric_cfg, dict) and bool(metric_cfg.get('needs_train_pred', False)):
+                    return True
+                # heuristic based on known evaluator names
+                name_low = str(metric_name).lower()
+                if 'train_test_gap' in name_low:
+                    return True
+                if isinstance(metric_cfg, dict):
+                    module_name = str(metric_cfg.get('file', ''))
+                    func_name = str(metric_cfg.get('function', ''))
+                    if module_name == 'sklearn_metrics' and func_name == 'train_test_gap_evaluate':
+                        return True
+            return False
+        except Exception:
+            return False
