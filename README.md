@@ -36,7 +36,49 @@ This README introduces the framework and provides a hands-on tutorial using `ben
 
 ## Quick Start
 You may use either **Python venv (recommended)** or **Conda** to set up the environment.
-### Option A: Python venv (Recommended)
+### Lightning AI example
+```bash
+# Create virtual environment with Python 3.11
+python3.11 -m venv venv_fault_benchmark
+# Activate (Linux/macOS)
+source venv_fault_benchmark/bin/activate
+# Activate (Windows)
+# venv_fault_benchmark\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt  # if missing, manually install torch, scikit-learn, numpy, pyyaml, matplotlib
+
+# Run benchmark
+cd benchmark
+python main.py configs/ExampleComplex.yaml
+```
+
+### Online Option: Run on Lightning AI Studio (T4 GPU)
+
+This option allows you to run the benchmark directly on a cloud GPU environment.
+
+```bash
+# 1. Launch a new Studio
+#    - Go to https://lightning.ai
+#    - Create a new Studio with a **T4 GPU** (sufficient for benchmarking)
+
+# 2. Install PyTorch with CUDA 12.6 support
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+
+# 3. Install required Python dependencies
+pip install numpy pandas scikit-learn matplotlib PyYAML openpyxl pynvml
+
+# 4. Clone the fault diagnosis benchmark repository
+git clone https://github.com/JialingRichard/fault_diagnosis_lib.git
+
+# 5. Navigate into the benchmark module
+cd fault_diagnosis_lib/benchmark/
+
+# 6. Run the benchmark with a sample configuration
+python main.py configs/ExampleComplex.yaml
+```
+
+### Local Option A: Python venv
 
 ```bash
 # Create virtual environment with Python 3.11
@@ -55,7 +97,7 @@ cd benchmark
 python main.py configs/ExampleComplex.yaml
 ```
 
-###  Option B: Conda
+###  Local Option B: Conda
 
 ```bash
 conda create -n fault-benchmark python=3.11
